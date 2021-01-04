@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	fmt.Printf("hello world%s", "!!!")
+	fmt.Printf("hello world%s\n", "!!!")
 	n := &node.Node{Name: "foo node"}
-	fmt.Print(n)
+	fmt.Println(n)
 }
