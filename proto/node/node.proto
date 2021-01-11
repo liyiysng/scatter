@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package scatter.node.proto;
+
+option go_package = "protobuf/node";
+
+// 节点标识
+message NodeIdentity{
+    string key = 1;
+}
+
+//节点状态
+message NodeState{
+    string key = 1;
+    string payload = 2;
+}
+
+
+// 节点相关服务
+service Node{
+    // 获取节点状态-
+    rpc GetNodeState (NodeIdentity) returns (NodeState);
+}
