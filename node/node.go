@@ -2,20 +2,22 @@
 package node
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"net"
-	"os"
-	"strings"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/liyiysng/scatter/internal/statsd"
-	"github.com/liyiysng/scatter/internal/util"
-
-	"github.com/liyiysng/scatter/internal/lg"
+	"github.com/liyiysng/scatter/logger"
+	"github.com/liyiysng/scatter/metrics"
+	"github.com/liyiysng/scatter/util"
+	"golang.org/x/net/trace"
 )
+
+// ErrNodeStopped 节点已经停止
+var ErrNodeStopped = errors.New("node: the node has been stopped")
 
 // 内部错误
 type errStore struct {
@@ -28,63 +30,162 @@ type Node struct {
 	// 客户端自增ID
 	clientIDSequence int64
 	// 选项
-	opts atomic.Value
+	opts Options
 	// 当前错误(最后一个错误)
 	errValue atomic.Value
 	// 开启时间
 	startTime time.Time
 
-	// 所有客户端
-	clientLock sync.RWMutex
-	clients    map[int64]Client
+	// 所有链接
+	conns map[net.Conn]bool
 
-	// tcp 监听
-	tcpListener net.Listener
+	// 监听对象
+	lis map[net.Listener]bool
 
 	// 退出chan
-	exitChan chan int
+	quit *util.Event
 	// 检测所有内部goroutine
 	waitGroup util.WaitGroupWrapper
+	// trace
+	trEvents trace.EventLog
+
+	// 标识是否启动
+	started bool
 }
 
 // NewNode 新建节点
-func NewNode(opts *Options) (n *Node, err error) {
+func NewNode(opt ...IOption) (n *Node, err error) {
+
+	opts := defaultOptions
+	for _, o := range opt {
+		o.apply(&opts)
+	}
+
 	// 缺省日志
 	if opts.Logger == nil {
-		opts.Logger = log.New(os.Stderr, opts.LogPrefix, log.Ldate|log.Ltime|log.Lmicroseconds)
+		opts.Logger = logger.GDepthLogger
 	}
 
 	n = &Node{
+		lis:       make(map[net.Listener]bool),
+		opts:      opts,
 		startTime: time.Now(),
-		clients:   make(map[int64]Client),
-		exitChan:  make(chan int),
+		conns:     make(map[net.Conn]bool),
+		quit:      util.NewEvent(),
 	}
 
-	n.swapOpts(opts)
+	if opts.enableEventTrace {
+		_, file, line, _ := runtime.Caller(1)
+		n.trEvents = trace.NewEventLog("scatter.Node", fmt.Sprintf("%s-%s:%d", opts.ID, file, line))
+	}
+
 	n.errValue.Store(&errStore{})
 
-	if opts.StatsdPrefix != "" {
-		var port string
-		_, port, err = net.SplitHostPort(opts.HTTPAddress)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse HTTP address (%s) - %s", opts.HTTPAddress, err)
-		}
-		statsdHostKey := statsd.HostKey(net.JoinHostPort(opts.BroadcastAddress, port))
-		prefixWithHost := strings.Replace(opts.StatsdPrefix, "%s", statsdHostKey, -1)
-		if prefixWithHost[len(prefixWithHost)-1] != '.' {
-			prefixWithHost += "."
-		}
-		opts.StatsdPrefix = prefixWithHost
-	}
-
-	n.logf(lg.INFO, "ID: %d", opts.ID)
-
-	n.tcpListener, err = net.Listen("tcp", opts.TCPAddress)
-	if err != nil {
-		return nil, fmt.Errorf("listen (%s) failed - %s", opts.TCPAddress, err)
-	}
+	opts.Logger.Infof("start node %s", opts.ID)
 
 	return
+}
+
+// Serve 在该lis上启动一个Serve
+// Serve 除Stop或者 被调用之外,都返回一个非nil错误,
+func (n *Node) Serve(lis net.Listener) error {
+	n.Lock()
+
+	n.trEventLogf("starting")
+	n.started = true
+
+	if n.lis == nil {
+		// Start called after Stop
+		n.Unlock()
+		lis.Close()
+		return ErrNodeStopped
+	}
+	n.lis[lis] = true
+
+	n.Unlock()
+
+	defer func() {
+		n.Lock()
+		if n.lis != nil && n.lis[lis] {
+			lis.Close()
+			delete(n.lis, lis)
+		}
+		n.Unlock()
+	}()
+
+	var tempDelay time.Duration // how long to sleep on accept failure
+	for {
+		rawConn, err := lis.Accept()
+		if err != nil {
+			if ne, ok := err.(interface {
+				Temporary() bool
+			}); ok && ne.Temporary() { // 临时错误
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				n.Lock()
+				n.trEventLogf("Accept error: %v; retrying in %v", err, tempDelay)
+				n.Unlock()
+				timer := time.NewTimer(tempDelay)
+				select {
+				case <-timer.C:
+				case <-n.quit.Done():
+					timer.Stop()
+					return nil
+				}
+				continue
+			}
+			// 不是临时错误/尝试失败
+			n.Lock()
+			n.trEventLogf("done; Accept = %v", err)
+			n.Unlock()
+
+			if n.quit.HasFired() {
+				return nil
+			}
+			return err
+		}
+		tempDelay = 0
+
+		n.waitGroup.Wrap(func() {
+			n.handleRawConn(rawConn)
+		}, nil)
+	}
+}
+
+// Stop 停止/关闭该节点
+func (n *Node) Stop() {
+	n.quit.Fire()
+
+	defer func() {
+		n.waitGroup.Wait()
+	}()
+
+	n.Lock()
+	listeners := n.lis
+	n.lis = nil
+	conns := n.conns
+	n.conns = nil
+	n.Unlock()
+
+	for lis := range listeners {
+		lis.Close()
+	}
+	for c := range conns {
+		c.Close()
+	}
+
+	n.Lock()
+	if n.trEvents != nil {
+		n.trEvents.Finish()
+		n.trEvents = nil
+	}
+	n.Unlock()
 }
 
 // SetHealth 设置当前节点最后一个错误 , 可重制错误
@@ -117,15 +218,51 @@ func (n *Node) GetHealth() string {
 	return "OK"
 }
 
-func (n *Node) swapOpts(opts *Options) {
-	n.opts.Store(opts)
+// 记录事件日志
+// 需求:已经持有锁
+func (n *Node) trEventLogf(format string, a ...interface{}) {
+	if n.trEvents != nil {
+		n.trEvents.Printf(format, a...)
+	}
 }
 
-func (n *Node) getOpts() *Options {
-	return n.opts.Load().(*Options)
+// 记录事件错误日志
+// 需求:已经持有锁
+func (n *Node) trEventErrorf(format string, a ...interface{}) {
+	if n.trEvents != nil {
+		n.trEvents.Errorf(format, a...)
+	}
 }
 
-func (n *Node) logf(level lg.LogLevel, f string, args ...interface{}) {
-	opts := n.getOpts()
-	lg.Logf(opts.Logger, opts.LogLevel, level, f, args...)
+func (n *Node) handleRawConn(rawConn net.Conn) {
+	if n.quit.HasFired() {
+		rawConn.Close()
+		return
+	}
+
+	if n.opts.connCountEnabled() { // 链接数
+		metrics.ReportNodeNewCommingConn(n.opts.ID)
+		defer metrics.ReportNodeNewCommingConn(n.opts.ID)
+	}
+}
+
+func (n *Node) addConn(conn net.Conn) bool {
+	n.Lock()
+	defer n.Unlock()
+
+	if n.conns == nil { //called after Stop
+		conn.Close()
+		return false
+	}
+
+	n.conns[conn] = true
+	return true
+}
+
+func (n *Node) removeConn(conn net.Conn) {
+	n.Lock()
+	defer n.Unlock()
+	if n.conns != nil {
+		delete(n.conns, conn)
+	}
 }
