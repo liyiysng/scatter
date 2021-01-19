@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package scatter.node.proto;
+
+option go_package = "protobuf/node";
+
+
+// 消息请求
+message MsgRequest{
+    int32 Sequence = 1;// 请求时由客户端填充 , 回复时由服务器设置相同序列 
+    string Service = 2;// 服务名称 如 Game.Foo
+    bytes Payload = 3;// 数据
+}
+
+// 消息回复
+message MsgResponse{
+    int32 Sequence = 1;// 请求时由客户端填充 , 回复时由服务器设置相同序列 
+    bytes Payload = 2;// 数据
+    string CustomError = 3;//自定义错误描述 货币不足等逻辑错误. 当设置错误是,Payload无效
+}
+
+// 消息通知 客户端=>服务器
+message MsgNotify{
+    bytes Payload = 1;// 数据
+}
+
+// 消息推送 服务器=>客户端
+message MsgPush{
+    string Command = 1;
+    bytes Payload = 2;// 数据
+}
+
+message MsgHeartbeat{
+    int64 TimeStamp = 1;
+}
+
+message MsgHeartbeatACK{
+    int64 TimeStamp = 1;
+}
+
+message MsgHandShake{
+    string Platform = 1;
+    string ClientVersion = 2;
+    string BuildVersion = 3;
+}
+
+message MsgHandShakeACK{
+    int64 TimeStamp = 1;
+}
+
+message MsgError{
+    string errorInfo = 1;
+}
