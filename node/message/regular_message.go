@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+
+	"github.com/liyiysng/scatter/constants"
 )
 
 // MsgRequest 消息请求
@@ -18,22 +20,24 @@ func (m *MsgRequest) GetMsgType() MsgType {
 	return REQUEST
 }
 
-// FromReader 实现Message接口
-func (m *MsgRequest) FromReader(r io.Reader) error {
+// FromBytes 实现Message接口
+func (m *MsgRequest) FromBytes(b []byte) error {
+	r := bytes.NewBuffer(b)
 	err := binary.Read(r, binary.BigEndian, &m.Sequence)
 	if err != nil {
+		if err == io.EOF { // 消息不完整
+			return io.ErrUnexpectedEOF
+		}
 		return err
 	}
-	err = r.Read()
+	str, err := ReadService(r)
 	if err != nil {
 		return err
 	}
+	m.Service = str
 
-	if buf, ok := r.(*bytes.Buffer); ok { // 减少拷贝,使用bytes.Next方法
-
-	} else {
-
-	}
+	// 读取剩余
+	m.Payload = r.Bytes()
 
 	return nil
 }
@@ -62,7 +66,7 @@ func (m *MsgNotify) GetMsgType() MsgType {
 
 // MsgPush 消息推送 服务器=>客户端
 type MsgPush struct {
-	Command string
+	Service [constants.MaxMessageServiceName]byte
 	Payload []byte // 数据
 }
 
