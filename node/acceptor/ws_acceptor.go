@@ -15,7 +15,7 @@ type WSAcceptor struct {
 	listener  net.Listener
 	opt       Option
 	closeOnce sync.Once
-	mu        sync.Mutex
+	closed    bool
 }
 
 // NewWSAcceptor creates a new instance of websocket acceptor
@@ -53,6 +53,8 @@ func (w *WSAcceptor) ListenAndServe() error {
 	w.listener = listener
 
 	defer w.Stop()
+	defer close(w.connChan)
+
 	w.listener = listener
 
 	if w.hasTLSCertificates() {
@@ -65,25 +67,28 @@ func (w *WSAcceptor) ListenAndServe() error {
 // Stop stops the acceptor
 func (w *WSAcceptor) Stop() {
 	w.closeOnce.Do(func() {
-		w.mu.Lock()
-		defer w.mu.Unlock()
 		err := w.listener.Close()
 		if err != nil {
 			w.opt.Logger.Errorf("Failed to stop: %s", err.Error())
 		}
-		close(w.connChan)
+		w.closed = true
 		w.opt.Logger.Info("stop ws listen: %s", w.opt.Addr)
 	})
 }
 
 func (w *WSAcceptor) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+
 	conn, err := conn.NewWSConn(rw, r, w.opt.GetConnOpt())
 	if err != nil {
 		w.opt.Logger.Errorf("[WSAcceptor.ServeHTTP] new NewWSConn err %s", err.Error())
 		return
 	}
 
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	if w.closed {
+		w.opt.Logger.Warningf("[WSAcceptor.ServeHTTP] acceptor closed.")
+		_ = conn.Close() // ignor error
+		return
+	}
+
 	w.connChan <- conn
 }

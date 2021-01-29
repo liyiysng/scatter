@@ -2,22 +2,30 @@
 package node
 
 import (
-	"errors"
 	"fmt"
-	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
+	"github.com/liyiysng/scatter/node/acceptor"
+	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/util"
 	"golang.org/x/net/trace"
 )
 
-// ErrNodeStopped 节点已经停止
-var ErrNodeStopped = errors.New("node: the node has been stopped")
+// SocketProtcol 协议类型
+type SocketProtcol string
+
+const (
+	// SocketProtcolTCP tcp 协议
+	SocketProtcolTCP SocketProtcol = "tcp"
+	// SocketProtcolWS websocket 协议
+	SocketProtcolWS SocketProtcol = "ws"
+)
 
 // 内部错误
 type errStore struct {
@@ -27,8 +35,8 @@ type errStore struct {
 // Node represent
 type Node struct {
 	sync.RWMutex
-	// 客户端自增ID
-	clientIDSequence int64
+	// session ID
+	sIDSequence int64
 	// 选项
 	opts Options
 	// 当前错误(最后一个错误)
@@ -37,10 +45,10 @@ type Node struct {
 	startTime time.Time
 
 	// 所有链接
-	conns map[net.Conn]bool
+	conns map[conn.MsgConn]bool
 
 	// 监听对象
-	lis map[net.Listener]bool
+	accs map[acceptor.Acceptor]bool
 
 	// 退出chan
 	quit *util.Event
@@ -67,10 +75,10 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 	}
 
 	n = &Node{
-		lis:       make(map[net.Listener]bool),
+		accs:      make(map[acceptor.Acceptor]bool),
 		opts:      opts,
 		startTime: time.Now(),
-		conns:     make(map[net.Conn]bool),
+		conns:     make(map[conn.MsgConn]bool),
 		quit:      util.NewEvent(),
 	}
 
@@ -104,75 +112,122 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 // 	}
 // }()
 
-// Serve 在该lis上启动一个Serve
-// Serve 除Stop或者 被调用之外,都返回一个非nil错误,
-func (n *Node) Serve(lis net.Listener) error {
-	n.Lock()
+// Serve 启动一个Serve
+// Serve 除Stop或者 被调用之外,都返回一个非nil错误
+// arg[0] = certfile
+// arg[1] = keyfile
+func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 
+	n.waitGroup.Add(1)
+	defer n.waitGroup.Done()
+
+	n.Lock()
 	n.trEventLogf("starting")
 	n.started = true
 
-	if n.lis == nil {
+	if n.accs == nil {
 		// Start called after Stop
 		n.Unlock()
-		lis.Close()
-		return ErrNodeStopped
+		return constants.ErrNodeStopped
 	}
-	n.lis[lis] = true
 
+	certFile := ""
+	keyFile := ""
+
+	if len(cert) > 0 {
+		if len(cert) != 2 {
+			n.Unlock()
+			return constants.ErrInvalidCertificates
+		}
+		certFile = cert[0]
+		keyFile = cert[1]
+	}
+
+	accOpt := acceptor.Option{
+		Addr:     addr,
+		CertFile: certFile,
+		KeyFile:  keyFile,
+		Logger:   n.opts.Logger,
+		GetConnOpt: func() conn.MsgConnOption {
+			ret := conn.MsgConnOption{
+				SID:                 atomic.AddInt64(&n.sIDSequence, 1),
+				MaxLength:           n.opts.maxPayloadLength,
+				ReadTimeout:         n.opts.readTimeout,
+				WriteTimeout:        n.opts.writeTimeout,
+				ReadBufferSize:      n.opts.readBufferSize,
+				WriteBufferSize:     n.opts.writeBufferSize,
+				Compresser:          n.opts.getCompressor(),
+				EnableLimit:         n.opts.enableLimit,
+				RateLimitReadBytes:  n.opts.rateLimitReadBytes,
+				RateLimitWriteBytes: n.opts.rateLimitWriteBytes,
+			}
+
+			// 读写字节数指标
+			if n.opts.metricsReadWriteBytesCountEnabled() {
+				ret.ReadCountReport = func(info conn.MsgConnInfo, byteCount int) {
+
+				}
+				ret.WriteCountReport = func(info conn.MsgConnInfo, byteCount int) {
+
+				}
+			}
+
+			return ret
+		},
+	}
+
+	var acc acceptor.Acceptor
+	if sp == SocketProtcolTCP {
+		acc = acceptor.NewTCPAcceptor(accOpt)
+	} else if sp == SocketProtcolWS {
+		acc = acceptor.NewWSAcceptor(accOpt)
+	} else {
+		n.Unlock()
+		return fmt.Errorf("[Node.Serve] unsupport socket protcol %s", sp)
+	}
+	n.accs[acc] = true
 	n.Unlock()
 
 	defer func() {
 		n.Lock()
-		if n.lis != nil && n.lis[lis] {
-			lis.Close()
-			delete(n.lis, lis)
+		if n.accs != nil && n.accs[acc] {
+			delete(n.accs, acc)
 		}
 		n.Unlock()
 	}()
 
-	var tempDelay time.Duration // how long to sleep on accept failure
+	n.Lock()
+	n.trEventLogf("[Node.Serve] protcol:%s addr %s", sp, addr)
+	n.Unlock()
+
+	// accept go
+	n.waitGroup.Wrap(
+		func() {
+			err := acc.ListenAndServe()
+			n.Lock()
+			n.trEventLogf("[Node.Serve] done serve protcol:%s addr %s", sp, addr)
+			n.Unlock()
+			if err != nil {
+				n.opts.Logger.Errorf("[Node.Serve] node %v stop %v", n.opts.ID, err)
+			}
+		}, n.opts.Logger.Errorf)
+
+	// 此处无需检查node是否退出
+	// node 停止时,会关闭所有的acceptor
 	for {
-		rawConn, err := lis.Accept()
-		if err != nil {
-			if ne, ok := err.(interface {
-				Temporary() bool
-			}); ok && ne.Temporary() { // 临时错误
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
+		select {
+		case c, ok := <-acc.GetConnChan():
+			{
+				if ok {
+					//handel conn go
+					n.waitGroup.Wrap(func() {
+						n.handleConn(c)
+					}, n.opts.Logger.Errorf)
 				} else {
-					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-				n.Lock()
-				n.trEventLogf("Accept error: %v; retrying in %v", err, tempDelay)
-				n.Unlock()
-				timer := time.NewTimer(tempDelay)
-				select {
-				case <-timer.C:
-				case <-n.quit.Done():
-					timer.Stop()
 					return nil
 				}
-				continue
 			}
-			// 不是临时错误/尝试失败
-			n.Lock()
-			n.trEventLogf("done; Accept = %v", err)
-			n.Unlock()
-
-			if n.quit.HasFired() {
-				return nil
-			}
-			return err
 		}
-		tempDelay = 0
-
-		n.waitGroup.Wrap(func() {
-			n.handleRawConn(rawConn)
-		}, nil)
 	}
 }
 
@@ -185,14 +240,14 @@ func (n *Node) Stop() {
 	}()
 
 	n.Lock()
-	listeners := n.lis
-	n.lis = nil
+	accs := n.accs
+	n.accs = nil
 	conns := n.conns
 	n.conns = nil
 	n.Unlock()
 
-	for lis := range listeners {
-		lis.Close()
+	for acc := range accs {
+		acc.Stop()
 	}
 	for c := range conns {
 		c.Close()
@@ -204,36 +259,6 @@ func (n *Node) Stop() {
 		n.trEvents = nil
 	}
 	n.Unlock()
-}
-
-// SetHealth 设置当前节点最后一个错误 , 可重制错误
-func (n *Node) SetHealth(err error) {
-	n.errValue.Store(errStore{err: err})
-}
-
-// IsHealthy 当前节点是否健康
-func (n *Node) IsHealthy() bool {
-	return n.GetError() == nil
-}
-
-// GetError 返回当前节点的最后一个错误
-func (n *Node) GetError() error {
-	errValue := n.errValue.Load()
-	return errValue.(errStore).err
-}
-
-// GetStartTime 获取创建时间
-func (n *Node) GetStartTime() time.Time {
-	return n.startTime
-}
-
-// GetHealth 获取当前节点健康状态信息
-func (n *Node) GetHealth() string {
-	err := n.GetError()
-	if err != nil {
-		return fmt.Sprintf("NOK - %s", err)
-	}
-	return "OK"
 }
 
 // 记录事件日志
@@ -252,35 +277,21 @@ func (n *Node) trEventErrorf(format string, a ...interface{}) {
 	}
 }
 
-func (n *Node) handleRawConn(rawConn net.Conn) {
+func (n *Node) handleConn(conn conn.MsgConn) {
 	if n.quit.HasFired() {
-		rawConn.Close()
+		conn.Close()
 		return
 	}
 
-	if n.opts.connCountEnabled() { // 链接数
+	n.Lock()
+	n.trEventLogf("[Node.handleConn] new connection local:%v remote:%v", conn.LocalAddr(), conn.RemoteAddr())
+	n.Unlock()
+
+	//指标:链接数
+	if n.opts.metricsConnCountEnabled() {
 		metrics.ReportNodeNewCommingConn(n.opts.ID)
 		defer metrics.ReportNodeNewCommingConn(n.opts.ID)
 	}
-}
 
-func (n *Node) addConn(conn net.Conn) bool {
-	n.Lock()
-	defer n.Unlock()
-
-	if n.conns == nil { //called after Stop
-		conn.Close()
-		return false
-	}
-
-	n.conns[conn] = true
-	return true
-}
-
-func (n *Node) removeConn(conn net.Conn) {
-	n.Lock()
-	defer n.Unlock()
-	if n.conns != nil {
-		delete(n.conns, conn)
-	}
+	// 创建session
 }

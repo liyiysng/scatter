@@ -11,11 +11,13 @@ import (
 )
 
 var (
-	myLog = logger.Component("node.acceptor")
+	myLog = logger.Component("node.conn")
 )
 
 // MsgConnOption 消息链接选项
 type MsgConnOption struct {
+	// session id
+	SID int64
 	// 消息最大长度(不包含头长度)
 	MaxLength int
 	// 读超时 zero表示永不超时
@@ -35,17 +37,24 @@ type MsgConnOption struct {
 	// 每秒写取字节数
 	RateLimitWriteBytes int64
 	// 报告读字节数
-	ReadCountReport func(byteCount int)
+	ReadCountReport func(info MsgConnInfo, byteCount int)
 	// 报告写字节数
-	WriteCountReport func(byteCount int)
+	WriteCountReport func(info MsgConnInfo, byteCount int)
 }
 
-// MsgConn 表示面向消息的链接
-type MsgConn interface {
+// MsgConnInfo 链接信息
+type MsgConnInfo interface {
+	// sid
+	GetSID() int64
 	// 对端地址
 	RemoteAddr() net.Addr
 	// 本地地址
 	LocalAddr() net.Addr
+}
+
+// MsgConn 表示面向消息的链接
+type MsgConn interface {
+	MsgConnInfo
 	// ReadNextMessage 获取下一个消息请求
 	ReadNextMessage() (msg message.Message, err error)
 	// WriteNextMessage 发送一个消息

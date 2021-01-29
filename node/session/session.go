@@ -10,8 +10,7 @@ import (
 // State 表示session当前状态
 type State struct {
 	SID           string `json:"sid"`
-	Hostname      string `json:"hostname"`
-	Version       string `json:"version"`
+	NID           string `json:"nid"`
 	RemoteAddress string `json:"remote_address"`
 }
 

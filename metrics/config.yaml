@@ -1,0 +1,14 @@
+scatter:
+  metrics:
+    custom:
+      counters:
+      - subsystem: node_conn
+        name: read_bytes_count
+        help: read bytes count
+        labels: ['nid', 'sid']
+      summaries:
+      - subsystem: node_conn
+        name: rpc_delay
+        help: rpc delay ns
+        objectives: {0.7: 0.05, 0.9: 0.01, 0.99: 0.001}
+        labels: ['nid',"method"]

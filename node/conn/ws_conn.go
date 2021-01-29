@@ -2,7 +2,6 @@ package conn
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 	"time"
 
@@ -15,8 +14,6 @@ import (
 
 type wsConn struct {
 	*websocket.Conn
-	typ     int // message type
-	reader  io.Reader
 	opt     MsgConnOption
 	rdBuket *ratelimit.Bucket
 	wrBuket *ratelimit.Bucket
@@ -55,12 +52,16 @@ func NewWSConn(w http.ResponseWriter, r *http.Request, opt MsgConnOption) (MsgCo
 	return ret, nil
 }
 
+func (c *wsConn) GetSID() int64 {
+	return c.opt.SID
+}
+
 func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 	//记录读取字节数
 	rdCount := 0
 	defer func() {
 		if c.opt.ReadCountReport != nil {
-			c.opt.ReadCountReport(rdCount)
+			c.opt.ReadCountReport(c, rdCount)
 		}
 	}()
 
@@ -121,7 +122,7 @@ func (c *wsConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) er
 	}
 
 	if c.opt.WriteCountReport != nil {
-		c.opt.WriteCountReport(len(writeBuffer.Bytes()))
+		c.opt.WriteCountReport(c, len(writeBuffer.Bytes()))
 	}
 
 	return nil

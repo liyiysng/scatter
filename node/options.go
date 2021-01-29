@@ -3,6 +3,7 @@ package node
 import (
 	"time"
 
+	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
 )
 
@@ -23,12 +24,24 @@ type Options struct {
 	// 日志实体
 	Logger logger.DepthLogger
 
+	// 链接设置
 	// 缓冲设置
 	writeBufferSize int
 	readBufferSize  int
-
+	// 数据最大长度
+	maxPayloadLength int
 	// 超时设置
 	connectionTimeout time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	// 压缩
+	compresser string
+	// 限流
+	enableLimit bool
+	// 读限流
+	rateLimitReadBytes int64
+	// 写限流
+	rateLimitWriteBytes int64
 
 	// trace
 	// 允许事件跟踪
@@ -37,20 +50,41 @@ type Options struct {
 	// 指标
 	metricsEnable bool
 	// 当前链接数
-	connCountEnable bool
+	metricsConnCountEnable bool
+	// 读/写字节数
+	metricsReadWriteBytesCountEnable bool
 }
 
-func (o *Options) connCountEnabled() bool {
+func (o *Options) metricsConnCountEnabled() bool {
 	if !o.metricsEnable {
 		return false
 	}
-	return o.connCountEnable
+	return o.metricsConnCountEnable
+}
+
+func (o *Options) metricsReadWriteBytesCountEnabled() bool {
+	if !o.metricsEnable {
+		return false
+	}
+	return o.metricsReadWriteBytesCountEnable
+}
+
+func (o *Options) getCompressor() encoding.Compressor {
+	if o.compresser != "" {
+		return encoding.GetCompressor(o.compresser)
+	}
+	return nil
 }
 
 var defaultOptions = Options{
-	connectionTimeout: 120 * time.Second,
 	writeBufferSize:   defaultWriteBufSize,
 	readBufferSize:    defaultReadBufSize,
+	maxPayloadLength:  32 * 1024,
+	connectionTimeout: 120 * time.Second,
+	readTimeout:       0,
+	writeTimeout:      0,
+	compresser:        "gzip",
+	enableLimit:       false,
 }
 
 // IOption 设置 日志等级等....

@@ -31,7 +31,12 @@ func NewConfig(cfgs ...*viper.Viper) *Config {
 
 func (c *Config) fillDefaultValues() {
 	defaultsMap := map[string]interface{}{
-		"pitaya.buffer.agent.messages": 100,
+		"scatter.game": "scatter",
+		// metrics config
+		"scatter.metrics.prometheus.port": 8888,
+		"scatter.metrics.additionalTags":  map[string]string{},
+		"scatter.metrics.constTags":       map[string]string{},
+		"scatter.metrics.custom":          map[string]interface{}{},
 	}
 
 	for param := range defaultsMap {

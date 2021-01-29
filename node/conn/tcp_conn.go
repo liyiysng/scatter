@@ -37,13 +37,17 @@ func NewTCPMsgConn(conn net.Conn, opt MsgConnOption) MsgConn {
 	}
 }
 
+func (c *tcpConn) GetSID() int64 {
+	return c.opt.SID
+}
+
 func (c *tcpConn) ReadNextMessage() (msg message.Message, err error) {
 
 	//记录读取字节数
 	rdCount := 0
 	defer func() {
 		if c.opt.ReadCountReport != nil {
-			c.opt.ReadCountReport(rdCount)
+			c.opt.ReadCountReport(c, rdCount)
 		}
 	}()
 
@@ -95,7 +99,7 @@ func (c *tcpConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) e
 	}
 
 	if c.opt.WriteCountReport != nil {
-		c.opt.WriteCountReport(wLen)
+		c.opt.WriteCountReport(c, wLen)
 	}
 
 	return nil
