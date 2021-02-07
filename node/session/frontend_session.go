@@ -58,23 +58,24 @@ type msgCtx struct {
 	// request , notify , heartbeat , handshake...
 	msgRead message.Message
 	// reponse , push , heatbeatact , handshakeact...
-	msgWrite message.Message
-	ctx      context.Context
-	cancel   context.CancelFunc
+	msgWrite      message.Message
+	ctx           context.Context
+	cancel        context.CancelFunc
+	timeoutCancel context.CancelFunc
 }
 
 func (mctx *msgCtx) WithTimeout(d time.Duration) {
 	if mctx.ctx == nil || mctx.cancel == nil {
 		panic("nil msgCtx")
 	}
-	mctx.ctx, _ = context.WithTimeout(mctx.ctx, d)
+	mctx.ctx, mctx.timeoutCancel = context.WithTimeout(mctx.ctx, d)
 }
 
 func (mctx *msgCtx) WithDeadline(d time.Time) {
 	if mctx.ctx == nil || mctx.cancel == nil {
 		panic("nil msgCtx")
 	}
-	mctx.ctx, _ = context.WithDeadline(mctx.ctx, d)
+	mctx.ctx, mctx.timeoutCancel = context.WithDeadline(mctx.ctx, d)
 }
 
 func (mctx *msgCtx) WithValue(key, val interface{}) {

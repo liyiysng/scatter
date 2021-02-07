@@ -5,7 +5,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	myLog = logger.Component("session")
 )
 
 // State 表示session当前状态
