@@ -94,24 +94,6 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 	return
 }
 
-// if err == io.EOF || err == io.ErrUnexpectedEOF {
-// 	t.Close()
-// 	return
-// }
-
-// defer func() {
-// 	if err == ErrConnClosing {
-// 		// Don't log ErrConnClosing as error since it happens
-// 		// 1. When the connection is closed by some other known issue.
-// 		// 2. User closed the connection.
-// 		// 3. A graceful close of connection.
-// 		if logger.V(logLevel) {
-// 			logger.Infof("transport: loopyWriter.run returning. %v", err)
-// 		}
-// 		err = nil
-// 	}
-// }()
-
 // Serve 启动一个Serve
 // Serve 除Stop或者 被调用之外,都返回一个非nil错误
 // arg[0] = certfile

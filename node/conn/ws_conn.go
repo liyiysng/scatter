@@ -56,6 +56,10 @@ func (c *wsConn) GetSID() int64 {
 	return c.opt.SID
 }
 
+func (c *wsConn) Flush() error {
+	return nil
+}
+
 func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 	//记录读取字节数
 	rdCount := 0

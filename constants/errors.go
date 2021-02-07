@@ -11,4 +11,12 @@ var (
 	ErrNodeStopped = errors.New("node: the node has been stopped")
 	// ErrMetricNotKnown 未知的指标
 	ErrMetricNotKnown = errors.New("the provided metric does not exist")
+
+	// ErrSessionClosed session已关闭
+	ErrSessionClosed = errors.New("session closed")
+	// ErrorPushBufferFull session push缓冲已满
+	ErrorPushBufferFull = errors.New("session push full")
+
+	// ErrorMsgDiscard 消息被丢弃
+	ErrorMsgDiscard = errors.New("message discard")
 )

@@ -3,6 +3,9 @@ package message
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/liyiysng/scatter/protobuf/node"
 )
 
 // MsgType 消息类型
@@ -66,6 +69,37 @@ type Message interface {
 	FromBytes(b []byte) error
 	// 写入b
 	ToBytes() (b []byte, err error)
+}
+
+// BuildPushMessage 创建一个push Message
+func BuildPushMessage(cmd string, data []byte) (msg Message) {
+	msg = &ProtobufMsgPush{
+		node.MsgPush{
+			Command: cmd,
+			Payload: data,
+		},
+	}
+	return
+}
+
+// BuildHeatAckMessage 创建一个心跳回复 Message
+func BuildHeatAckMessage() (msg Message) {
+	msg = &ProtobufMsgHeartbeatACK{
+		node.MsgHeartbeatACK{
+			TimeStamp: time.Now().Unix(),
+		},
+	}
+	return
+}
+
+// BuildHandShakeAckMessage 创建一个握手回复 Message
+func BuildHandShakeAckMessage() (msg Message) {
+	msg = &ProtobufMsgHandShakeACK{
+		node.MsgHandShakeACK{
+			TimeStamp: time.Now().Unix(),
+		},
+	}
+	return
 }
 
 // BuildMessage 根据给定类型和buf构建消息

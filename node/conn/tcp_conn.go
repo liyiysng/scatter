@@ -70,6 +70,10 @@ func (c *tcpConn) ReadNextMessage() (msg message.Message, err error) {
 	return
 }
 
+func (c *tcpConn) Flush() error {
+	return c.bufIO.Flush()
+}
+
 // WriteNextMessage 发送一个消息
 func (c *tcpConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) error {
 	buf, err := msg.ToBytes()
@@ -89,11 +93,6 @@ func (c *tcpConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) e
 		c.SetWriteDeadline(time.Now().Add(c.opt.WriteTimeout))
 	}
 	wLen, err := p.WriteTo(c.bufIO, c.opt.Compresser, c.opt.MaxLength)
-	if err != nil {
-		return err
-	}
-
-	err = c.bufIO.Flush()
 	if err != nil {
 		return err
 	}

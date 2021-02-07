@@ -3,13 +3,14 @@ package session
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 )
 
 // State 表示session当前状态
 type State struct {
-	SID           string `json:"sid"`
+	SID           int64  `json:"sid"`
 	NID           string `json:"nid"`
 	RemoteAddress string `json:"remote_address"`
 }
@@ -22,7 +23,11 @@ type Session interface {
 	// Stats 获取客户端状态
 	Stats() State
 	// 向客户端推送消息
-	Push(ctx context.Context, cmd string, msg proto.Message) error
+	Push(ctx context.Context, cmd string, data []byte) error
+	// 向客户端推送消息
+	PushTimeout(ctx context.Context, cmd string, data []byte, timeout time.Duration) error
+	// 向客户端推送,若发送缓冲已满则会返回 ErrorPushBufferFull
+	PushImmediately(ctx context.Context, cmd string, data []byte) error
 	// 关闭回调
 	OnClose(onClose OnClose)
 	// session是否关闭

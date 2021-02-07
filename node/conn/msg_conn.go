@@ -59,6 +59,8 @@ type MsgConn interface {
 	ReadNextMessage() (msg message.Message, err error)
 	// WriteNextMessage 发送一个消息
 	WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) error
+	// Flush 将缓存数据发送对端
+	Flush() error
 	// 关闭链接
 	Close() error
 }

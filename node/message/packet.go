@@ -3,7 +3,6 @@ package message
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"sync"
@@ -162,23 +161,4 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 // Reset 重置Packet
 func (p *Packet) Reset() {
 	p.Data = nil
-}
-
-// ReadService 读取服务名
-// 由于各个平台的字符串表达方式不同,采用 1byte(str length)+str
-func ReadService(r io.Reader) (service string, err error) {
-	var strLen uint8
-	err = binary.Read(r, binary.BigEndian, &strLen)
-	if err != nil {
-		return "", err
-	}
-	if strLen > constants.MaxMessageServiceName {
-		return "", fmt.Errorf("[ReadService] invalid service length %d", strLen)
-	}
-	buf := make([]byte, strLen)
-	_, err = io.ReadFull(r, buf)
-	if err != nil {
-		return "", err
-	}
-	return string(buf), nil
 }

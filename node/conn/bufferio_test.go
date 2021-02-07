@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"testing"
+	"time"
 )
 
 type buf20Bytes struct {
@@ -16,6 +17,28 @@ func (b *buf20Bytes) Read(p []byte) (n int, err error) {
 	}
 
 	return 20, io.EOF
+
+}
+
+func TestReadNilChan(t *testing.T) {
+	ch := make(chan struct{})
+	//ctx := context.Background()
+
+	var ctxDone chan struct{}
+
+	go func() {
+		time.Sleep(time.Second * 2)
+		close(ch)
+	}()
+
+	select {
+	case <-ctxDone:
+		t.Log("ctx done")
+	case <-ch:
+		t.Log("done")
+	}
+
+	t.Fatal("-")
 
 }
 
