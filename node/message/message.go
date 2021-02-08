@@ -2,7 +2,9 @@
 package message
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/liyiysng/scatter/protobuf/node"
@@ -102,6 +104,28 @@ func BuildHandShakeAckMessage() (msg Message) {
 	return
 }
 
+// BuildResponseMessage 创建一个回复
+func BuildResponseMessage(sequence int32, payload []byte) (msg Message) {
+	msg = &ProtobufMsgResponse{
+		node.MsgResponse{
+			Sequence: sequence,
+			Payload:  payload,
+		},
+	}
+	return
+}
+
+// BuildResponseCustomErrorMessage 创建一个自定义错误回复
+func BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message) {
+	msg = &ProtobufMsgResponse{
+		node.MsgResponse{
+			Sequence:    sequence,
+			CustomError: customError,
+		},
+	}
+	return
+}
+
 // BuildMessage 根据给定类型和buf构建消息
 func BuildMessage(mtype MsgType, buf []byte) (msg Message, err error) {
 	switch mtype {
@@ -141,4 +165,13 @@ func BuildMessage(mtype MsgType, buf []byte) (msg Message, err error) {
 		return nil, err
 	}
 	return
+}
+
+// GetSrvMethod 获取服务名和方法名
+func GetSrvMethod(service string) (srvName, methodName string, err error) {
+	dot := strings.LastIndex(srvName, ".")
+	if dot < 0 {
+		return "", "", errors.New("[frontendSession.handleMsg]: service/method ill-formed: " + service)
+	}
+	return service[:dot], service[dot+1:], nil
 }

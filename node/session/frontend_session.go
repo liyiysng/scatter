@@ -266,7 +266,7 @@ func (s *frontendSession) Close() {
 	s.closeEvent.Fire()
 }
 
-func (s *frontendSession) handle() {
+func (s *frontendSession) handle(srvHandler handle.IHandler) {
 
 	tick := time.NewTicker(s.opt.KeepAlive)
 	defer tick.Stop()
@@ -320,17 +320,21 @@ func (s *frontendSession) handle() {
 				}
 
 				// 处理消息
-				err := s.handleMsg(mctx)
+				err := s.handleMsg(mctx, srvHandler)
 				if err != nil {
 					// 关键错误
 					if cErr, ok := err.(handle.ICriticalError); ok {
 						s.finishMsg(mctx, cErr)
 						s.opt.Logger.Errorf("handle message encount a critical error %v", cErr)
 						return
+					} else if customErr, ok := err.(handle.ICustomError); ok {
+						// 非关键错误
+						s.opt.Logger.Warningf("handle message encount custom error %v", customErr)
+					} else {
+						s.finishMsg(mctx, cErr)
+						s.opt.Logger.Errorf("handle message encount a error %v", err)
+						return
 					}
-					// 非关键错误
-					s.opt.Logger.Warningf("handle message encount a critical error %v", err)
-					// 通知客户端错误
 				}
 			}
 		case <-tick.C: // 检查心跳
@@ -344,7 +348,7 @@ func (s *frontendSession) handle() {
 
 }
 
-func (s *frontendSession) handleMsg(mctx *msgCtx) error {
+func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) error {
 
 	if mctx.ctx.Err() != nil { // 已经超时或取消
 		return handle.NewCustomErrorWithError(mctx.ctx.Err())
@@ -357,12 +361,50 @@ func (s *frontendSession) handleMsg(mctx *msgCtx) error {
 	// 处理读取的消息
 	switch mctx.msgRead.GetMsgType() {
 	case message.NOTIFY:
-		fallthrough
+		{
+			reqMsg := mctx.msgRead.(*message.ProtobufMsgNotify)
+
+			serviceName, methodName, err := message.GetSrvMethod(reqMsg.Service)
+			if err != nil {
+				return handle.NewCriticalErrorWithError(err)
+			}
+
+			err = srvHandler.Notify(mctx.ctx, s, serviceName, methodName, reqMsg.Payload)
+
+			if err != nil {
+				return err
+			}
+			s.finishMsg(mctx, nil)
+		}
 	case message.REQUEST:
 		{
-			// 结束消息
-			if mctx.msgRead.GetMsgType() == message.NOTIFY {
-				s.finishMsg(mctx, nil)
+			reqMsg := mctx.msgRead.(*message.ProtobufMsgRequest)
+
+			serviceName, methodName, err := message.GetSrvMethod(reqMsg.Service)
+			if err != nil {
+				return handle.NewCriticalErrorWithError(err)
+			}
+
+			resBuf, err := srvHandler.Call(mctx.ctx, s, serviceName, methodName, reqMsg.Payload)
+
+			if err != nil {
+				if customErr, ok := err.(handle.ICustomError); ok {
+					// 非关键错误
+					// 回复客户端
+					mctx.msgWrite = message.BuildResponseCustomErrorMessage(reqMsg.Sequence, customErr.Error())
+					err = s.sendWrite(mctx)
+					if err != nil {
+						return err
+					}
+				}
+				return err
+			}
+
+			// 回复客户端
+			mctx.msgWrite = message.BuildResponseMessage(reqMsg.Sequence, resBuf)
+			err = s.sendWrite(mctx)
+			if err != nil {
+				return err
 			}
 		}
 	case message.HEARTBEAT:

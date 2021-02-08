@@ -53,7 +53,7 @@ func NewLogger(infoW, warningW, errorW io.Writer) Logger {
 // verbosity level.
 func NewLoggerWithVerbosity(infoW, warningW, errorW io.Writer, v int) Logger {
 	var m []*log.Logger
-	m = append(m, log.New(infoW, severityName[infoLog]+": ", log.LstdFlags))
+	m = append(m, log.New(infoW, severityName[infoLog]+": ", log.LstdFlags|log.Lshortfile))
 	m = append(m, log.New(io.MultiWriter(infoW, warningW), severityName[warningLog]+": ", log.LstdFlags|log.Lshortfile))
 	ew := io.MultiWriter(infoW, warningW, errorW) // ew will be used for error and fatal.
 	m = append(m, log.New(ew, severityName[errorLog]+": ", log.LstdFlags|log.Lshortfile))
@@ -69,6 +69,9 @@ func newLogger() Logger {
 	infoW := ioutil.Discard
 
 	logLevel := os.Getenv("NODE_GO_LOG_SEVERITY_LEVEL")
+
+	logLevel = "INFO"
+
 	switch logLevel {
 	case "", "ERROR", "error": // If env is unset, set level to ERROR.
 		errorW = os.Stderr

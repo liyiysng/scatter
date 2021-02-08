@@ -53,8 +53,8 @@ type service struct {
 
 // OptionalArgs 可选参数
 type OptionalArgs struct {
-	ArgsTypeValidator func(argsType []reflect.Type) error
-	Call              func(session interface{}, srvName string, mName string, caller func(argValues ...interface{}) error) error
+	ArgsTypeValidator func(srvName string, methodName string, argsType []reflect.Type) error
+	Call              func(session interface{}, srvName string, methodName string, caller func(argValues ...interface{}) error) error
 }
 
 // Option handle 选项设置
@@ -84,7 +84,8 @@ func NewServiceHandle(opt *Option) IHandler {
 	}
 
 	return &serviceHandler{
-		Option: opt,
+		Option:     opt,
+		serviceMap: make(map[string]*service),
 	}
 }
 
@@ -100,15 +101,15 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 	if svci, ok := s.serviceMap[serviceName]; ok {
 		mtype, ok := svci.method[methodName]
 		if !ok {
-			err = NewCriticalErrorf("[serviceHandler.Call] can't find service %s method %s", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Call] can't find %s.%s", serviceName, methodName)
 			return
 		}
 		if mtype.sgType != callType {
-			err = NewCriticalErrorf("[serviceHandler.Call] service %s method %s is a notify method", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s is a notify method", serviceName, methodName)
 			return
 		}
 
-		argReq := reflect.New(mtype.reqType)
+		argReq := reflect.New(mtype.reqType.Elem())
 		err = s.Codec.Unmarshal(req, argReq.Interface())
 		if err != nil {
 			err = NewCustomErrorWithError(err)
@@ -169,13 +170,13 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 		err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), caller)
 
 		if err != nil {
-			err = NewCriticalErrorf("[serviceHandler.Call] service %s method %s error %v", serviceName, methodName, err)
+			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s error %v", serviceName, methodName, err)
 			return
 		}
 
-		callerRes := retValues[1].Interface()
+		callerRes := retValues[0].Interface()
 		if callerRes == nil {
-			err = NewCriticalErrorf("[serviceHandler.Call] service %s method %s nil response", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s nil response", serviceName, methodName)
 			return
 		}
 
@@ -184,7 +185,7 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 
 	}
 
-	err = NewCriticalErrorf("[serviceHandler.Call] can't find service %s method %s", serviceName, methodName)
+	err = NewCriticalErrorf("[serviceHandler.Call] can't find %s.%s", serviceName, methodName)
 	return
 }
 
@@ -192,15 +193,15 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 	if svci, ok := s.serviceMap[serviceName]; ok {
 		mtype, ok := svci.method[methodName]
 		if !ok {
-			err = NewCriticalErrorf("[serviceHandler.Notify] can't find service %s method %s", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Notify] can't find %s.%s", serviceName, methodName)
 			return
 		}
 		if mtype.sgType != notifyType {
-			err = NewCriticalErrorf("[serviceHandler.Notify] service %s method %s is a call method", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Notify] %s.%s is a call method", serviceName, methodName)
 			return
 		}
 
-		argReq := reflect.New(mtype.reqType)
+		argReq := reflect.New(mtype.reqType.Elem())
 		err = s.Codec.Unmarshal(req, argReq.Interface())
 		if err != nil {
 			err = NewCustomErrorWithError(err)
@@ -253,20 +254,14 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 		err = s.HookNofify(ctx, session, svci, serviceName, methodName, argReq.Interface(), caller)
 
 		if err != nil {
-			err = NewCriticalErrorf("[serviceHandler.Call] service %s method %s error %v", serviceName, methodName, err)
-			return
-		}
-
-		callerRes := retValues[1].Interface()
-		if callerRes == nil {
-			err = NewCriticalErrorf("[serviceHandler.Call] service %s method %s nil response", serviceName, methodName)
+			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s error %v", serviceName, methodName, err)
 			return
 		}
 		return
 
 	}
 
-	err = NewCriticalErrorf("[serviceHandler.Call] can't find service %s method %s", serviceName, methodName)
+	err = NewCriticalErrorf("[serviceHandler.Call] can't find %s.%s", serviceName, methodName)
 	return
 }
 
@@ -287,13 +282,13 @@ func (s *serviceHandler) register(recv interface{}, name string, useName bool) e
 	srv.name = sname
 
 	// Install the methods
-	srv.method = s.suitableMethods(srv.typ, true)
+	srv.method = s.suitableMethods(srv.typ, sname, true)
 
 	if len(srv.method) == 0 {
 		str := ""
 
 		// To help the user, see if a pointer receiver would work.
-		method := s.suitableMethods(reflect.PtrTo(srv.typ), false)
+		method := s.suitableMethods(reflect.PtrTo(srv.typ), sname, false)
 		if len(method) != 0 {
 			str = "serviceHandler.Register: type " + sname + " has no exported methods of suitable type (hint: pass a pointer to value of that type)"
 		} else {
@@ -310,7 +305,7 @@ func (s *serviceHandler) register(recv interface{}, name string, useName bool) e
 	return nil
 }
 
-func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[string]*methodType {
+func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, reportErr bool) map[string]*methodType {
 	methods := make(map[string]*methodType)
 	for m := 0; m < typ.NumMethod(); m++ {
 		method := typ.Method(m)
@@ -326,7 +321,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		// Method needs more than 4 in arg num (include recv itself)
 		if mtype.NumIn() < 4 {
 			if reportErr {
-				myLog.Error("method", mname, "has wrong number of ins:", mtype.NumIn())
+				myLog.Errorf("method %s.%s has wrong number of ins: %d", srvName, mname, mtype.NumIn())
 			}
 			continue
 		}
@@ -334,7 +329,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		// First arg need be a context.Context
 		if argCtx := mtype.In(1); argCtx != typeOfContext {
 			if reportErr {
-				myLog.Error("method", mname, " first argument type not a context.Context:", argCtx)
+				myLog.Errorf("method %s.%s first argument type not a context.Context: %v", srvName, mname, argCtx)
 			}
 			continue
 		}
@@ -342,7 +337,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		// second arg need be a session
 		if argSession := mtype.In(2); argSession != s.SessionType {
 			if reportErr {
-				myLog.Error("method", mname, " first argument type not a session:", argSession)
+				myLog.Errorf("method %s.%s first argument type not a session but a %v", srvName, mname, argSession)
 			}
 			continue
 		}
@@ -351,20 +346,20 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		argReq := mtype.In(3)
 		if argReq.Kind() != reflect.Ptr {
 			if reportErr {
-				myLog.Error("method", mname, "argument type not a pointer:", argReq)
+				myLog.Errorf("method %s.%s argument type not a pointer: %v", srvName, mname, argReq)
 			}
 			continue
 		}
 		if !isExportedOrBuiltinType(argReq) {
 			if reportErr {
-				myLog.Error(mname, "argument type not exported:", argReq)
+				myLog.Errorf("method %s.%s argument type not exported: %v", srvName, mname, argReq)
 			}
 			continue
 		}
 		err := s.ReqTypeValidator(argReq)
 		if err != nil {
 			if reportErr {
-				myLog.Error("method", mname, "argument type invalid  :", argReq, " ", err)
+				myLog.Errorf("method %s.%s argument type %v invalid %v ", srvName, mname, argReq, err)
 			}
 			continue
 		}
@@ -376,7 +371,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		if mtype.NumIn() > 4 {
 			if s.OptArgs == nil {
 				if reportErr {
-					myLog.Errorf("method %s optional args not support", mname)
+					myLog.Errorf("method %s.%s optional args not support", srvName, mname)
 				}
 				continue
 			}
@@ -387,9 +382,9 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 				optArgsInTypes = append(optArgsInTypes, mtype.In(i))
 			}
 
-			err = s.OptArgs.ArgsTypeValidator(optArgsInTypes)
+			err = s.OptArgs.ArgsTypeValidator(srvName, mname, optArgsInTypes)
 			if err != nil {
-				myLog.Errorf("method %s optional args type invalid %v", mname, err)
+				myLog.Errorf("method %s.%s optional args type invalid %v", srvName, mname, err)
 				continue
 			}
 			mt.hasOptArgs = true
@@ -398,7 +393,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 		// Method needs one or two out.
 		if mtype.NumOut() != 1 && mtype.NumOut() != 2 {
 			if reportErr {
-				myLog.Error("method ", mname, " has wrong number of outs:", mtype.NumOut())
+				myLog.Errorf("method %s.%s has wrong number of outs: %d", srvName, mname, mtype.NumOut())
 			}
 			continue
 		}
@@ -409,7 +404,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 			returnType := mtype.Out(0)
 			if returnType != typeOfError {
 				if reportErr {
-					myLog.Error("method", mname, "returns", returnType.String(), "not error")
+					myLog.Errorf("method %s.%s returns %v not an error type", srvName, mname, returnType)
 				}
 				continue
 			}
@@ -420,27 +415,27 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, reportErr bool) map[s
 			returnResType := mtype.Out(0)
 			if returnResType.Kind() != reflect.Ptr {
 				if reportErr {
-					myLog.Error("method", mname, "return type not a pointer:", returnResType)
+					myLog.Errorf("method %s.%s return type not a pointer: %v", srvName, mname, returnResType)
 				}
 				continue
 			}
 			if !isExportedOrBuiltinType(returnResType) {
 				if reportErr {
-					myLog.Error("method", mname, "return type not exported:", returnResType)
+					myLog.Errorf("method %s.%s return type not exported: %v", srvName, mname, returnResType)
 				}
 				continue
 			}
 			err = s.ResTypeValidator(returnResType)
 			if err != nil {
 				if reportErr {
-					myLog.Error("method", mname, "return type invalid :", returnResType, " ", err)
+					myLog.Errorf("method %s.%s return type invalid :%v err: %v", srvName, mname, returnResType, err)
 				}
 				continue
 			}
 			// The second return type of the method must be error.
 			if returnErrType := mtype.Out(1); returnErrType != typeOfError {
 				if reportErr {
-					myLog.Error("method", mname, "returns", returnErrType.String(), "not error")
+					myLog.Errorf("method %s.%s returns: %v not an error type", srvName, mname, returnErrType)
 				}
 				continue
 			}
