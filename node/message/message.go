@@ -3,11 +3,7 @@ package message
 
 import (
 	"errors"
-	"fmt"
 	"strings"
-	"time"
-
-	"github.com/liyiysng/scatter/protobuf/node"
 )
 
 // MsgType 消息类型
@@ -53,13 +49,8 @@ func (mt *MsgType) String() string {
 	return msgTypes[*mt]
 }
 
-// MsgOpt 消息选项
-type MsgOpt byte
-
-const (
-	// COMPRESS 是否压缩
-	COMPRESS MsgOpt = 0x01
-)
+// MsgFactory 消息工厂
+var MsgFactory Factor = &protoBufFactory{}
 
 // Message 表示一条消息
 type Message interface {
@@ -71,100 +62,33 @@ type Message interface {
 	FromBytes(b []byte) error
 	// 写入b
 	ToBytes() (b []byte, err error)
+	// 获取服务Game.Foo
+	GetService() string
+	// 获取序号
+	GetSequence() int32
+	// 获取数据
+	GetPayload() []byte
 }
 
-// BuildPushMessage 创建一个push Message
-func BuildPushMessage(cmd string, data []byte) (msg Message) {
-	msg = &ProtobufMsgPush{
-		node.MsgPush{
-			Command: cmd,
-			Payload: data,
-		},
-	}
-	return
-}
+// Factor 消息工厂,更具数据构建消息
+type Factor interface {
+	// BuildMessage 根据buf构建消息
+	BuildMessage(buf []byte) (msg Message, err error)
+	// BuildPushMessage 创建一个push Message
+	BuildPushMessage(cmd string, data []byte) (msg Message, err error)
+	// BuildHeatAckMessage 创建一个心跳回复 Message
+	BuildHeatAckMessage() (msg Message, err error)
+	// BuildHandShakeMessage 创建一个握手消息 Message
+	BuildHandShakeMessage(platform, clientVersion, buildVersion string) (msg Message, err error)
+	// BuildHandShakeAckMessage 创建一个握手回复 Message
+	BuildHandShakeAckMessage() (msg Message, err error)
+	// BuildResponseMessage 创建一个回复
+	BuildResponseMessage(sequence int32, payload []byte) (msg Message, err error)
+	//BuildResponseCustomErrorMessage 创建一个自定义错误回复
+	BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message, err error)
 
-// BuildHeatAckMessage 创建一个心跳回复 Message
-func BuildHeatAckMessage() (msg Message) {
-	msg = &ProtobufMsgHeartbeatACK{
-		node.MsgHeartbeatACK{
-			TimeStamp: time.Now().Unix(),
-		},
-	}
-	return
-}
-
-// BuildHandShakeAckMessage 创建一个握手回复 Message
-func BuildHandShakeAckMessage() (msg Message) {
-	msg = &ProtobufMsgHandShakeACK{
-		node.MsgHandShakeACK{
-			TimeStamp: time.Now().Unix(),
-		},
-	}
-	return
-}
-
-// BuildResponseMessage 创建一个回复
-func BuildResponseMessage(sequence int32, payload []byte) (msg Message) {
-	msg = &ProtobufMsgResponse{
-		node.MsgResponse{
-			Sequence: sequence,
-			Payload:  payload,
-		},
-	}
-	return
-}
-
-// BuildResponseCustomErrorMessage 创建一个自定义错误回复
-func BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message) {
-	msg = &ProtobufMsgResponse{
-		node.MsgResponse{
-			Sequence:    sequence,
-			CustomError: customError,
-		},
-	}
-	return
-}
-
-// BuildMessage 根据给定类型和buf构建消息
-func BuildMessage(mtype MsgType, buf []byte) (msg Message, err error) {
-	switch mtype {
-
-	case REQUEST: // REQUEST 请求消息
-		msg = &ProtobufMsgRequest{}
-		break
-	case RESPONSE: // RESPONSE 回复消息
-		msg = &ProtobufMsgResponse{}
-		break
-	case NOTIFY: // NOTIFY 通知消息 客户端=>服务器
-		msg = &ProtobufMsgNotify{}
-		break
-	case PUSH: // PUSH 推送消息 服务器=>客户端
-		msg = &ProtobufMsgPush{}
-		break
-	case HEARTBEAT: // HEARTBEAT 心跳/ping 消息
-		msg = &ProtobufMsgHeartbeat{}
-		break
-	case HEARTBEATACK: // HEARTBEATACK 心跳/ping 回复
-		msg = &ProtobufMsgHeartbeatACK{}
-		break
-	case HANDSHAKE: // HANDSHAKE 握手消息
-		msg = &ProtobufMsgHandShake{}
-		break
-	case HANDSHAKEACK: // HANDSHAKEACK 握手消息回复
-		msg = &ProtobufMsgHandShakeACK{}
-		break
-	case ERROR: // ERROR 错误消息 服务器=>客户端
-		msg = &ProtobufMsgError{}
-	default:
-		return nil, fmt.Errorf("[BuildMessage] invalid message type [%s]", mtype.String())
-	}
-
-	err = msg.FromBytes(buf)
-	if err != nil {
-		return nil, err
-	}
-	return
+	// ParseHandShake 解析握手数据
+	ParseHandShake(buf []byte) (h interface{}, err error)
 }
 
 // GetSrvMethod 获取服务名和方法名

@@ -2,185 +2,129 @@ package message
 
 import (
 	"github.com/golang/protobuf/proto"
-	"github.com/liyiysng/scatter/protobuf/node"
+	phead "github.com/liyiysng/scatter/node/message/proto"
 )
 
-// ProtobufMsgRequest 消息请求
-type ProtobufMsgRequest struct {
-	node.MsgRequest
+// ProtobufMsg protobuf类型消息
+type ProtobufMsg struct {
+	phead.Head
 }
 
 // GetMsgType 实现Message接口
-func (m *ProtobufMsgRequest) GetMsgType() MsgType {
-	return REQUEST
+func (m *ProtobufMsg) GetMsgType() MsgType {
+	return MsgType(m.MsgType)
 }
 
 // FromBytes 实现Message接口
-func (m *ProtobufMsgRequest) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgRequest)
+func (m *ProtobufMsg) FromBytes(b []byte) error {
+	return proto.Unmarshal(b, &m.Head)
 }
 
 // ToBytes 实现Message接口
-func (m *ProtobufMsgRequest) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgRequest)
+func (m *ProtobufMsg) ToBytes() (b []byte, err error) {
+	return proto.Marshal(&m.Head)
 }
 
-// ProtobufMsgResponse 消息回复
-type ProtobufMsgResponse struct {
-	node.MsgResponse
+// protoBufFactory probuf类型的工厂
+type protoBufFactory struct {
 }
 
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgResponse) GetMsgType() MsgType {
-	return RESPONSE
+// BuildMessage 根据buf构建消息
+func (f *protoBufFactory) BuildMessage(buf []byte) (msg Message, err error) {
+	msg = &ProtobufMsg{}
+	err = msg.FromBytes(buf)
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
-// FromBytes 实现Message接口
-func (m *ProtobufMsgResponse) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgResponse)
+// BuildPushMessage 创建一个push Message
+func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType: int32(PUSH),
+			Service: cmd,
+			Payload: data,
+		},
+	}
+	return
 }
 
-// ToBytes 实现Message接口
-func (m *ProtobufMsgResponse) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgResponse)
+// BuildHeatAckMessage 创建一个心跳回复 Message
+func (f *protoBufFactory) BuildHeatAckMessage() (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType: int32(HEARTBEATACK),
+		},
+	}
+	return
 }
 
-// ProtobufMsgNotify 消息通知 客户端=>服务器
-type ProtobufMsgNotify struct {
-	node.MsgNotify
+// BuildHandShakeMessage 创建一个握手消息 Message
+func (f *protoBufFactory) BuildHandShakeMessage(platform, clientVersion, buildVersion string) (msg Message, err error) {
+
+	handShake := &phead.MsgHandShake{
+		Platform:      platform,
+		ClientVersion: clientVersion,
+		BuildVersion:  buildVersion,
+	}
+
+	buf, err := proto.Marshal(handShake)
+	if err != nil {
+		return nil, err
+	}
+
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType: int32(HANDSHAKE),
+			Payload: buf,
+		},
+	}
+	return
 }
 
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgNotify) GetMsgType() MsgType {
-	return NOTIFY
+// BuildHandShakeAckMessage 创建一个握手回复 Message
+func (f *protoBufFactory) BuildHandShakeAckMessage() (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType: int32(HANDSHAKEACK),
+		},
+	}
+	return
 }
 
-// FromBytes 实现Message接口
-func (m *ProtobufMsgNotify) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgNotify)
+// BuildResponseMessage 创建一个回复
+func (f *protoBufFactory) BuildResponseMessage(sequence int32, payload []byte) (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType:  int32(RESPONSE),
+			Sequence: sequence,
+			Payload:  payload,
+		},
+	}
+	return
 }
 
-// ToBytes 实现Message接口
-func (m *ProtobufMsgNotify) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgNotify)
+//BuildResponseCustomErrorMessage 创建一个自定义错误回复
+func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType:     int32(RESPONSE),
+			Sequence:    sequence,
+			CustomError: customError,
+		},
+	}
+	return
 }
 
-// ProtobufMsgPush 消息推送 服务器=>客户端
-type ProtobufMsgPush struct {
-	node.MsgPush
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgPush) GetMsgType() MsgType {
-	return PUSH
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgPush) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgPush)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgPush) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgPush)
-}
-
-// ProtobufMsgHeartbeat 心跳消息
-type ProtobufMsgHeartbeat struct {
-	node.MsgHeartbeat
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgHeartbeat) GetMsgType() MsgType {
-	return HEARTBEAT
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgHeartbeat) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgHeartbeat)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgHeartbeat) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgHeartbeat)
-}
-
-// ProtobufMsgHeartbeatACK 心跳回复
-type ProtobufMsgHeartbeatACK struct {
-	node.MsgHeartbeatACK
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgHeartbeatACK) GetMsgType() MsgType {
-	return HEARTBEATACK
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgHeartbeatACK) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgHeartbeatACK)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgHeartbeatACK) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgHeartbeatACK)
-}
-
-// ProtobufMsgHandShake 握手消息
-type ProtobufMsgHandShake struct {
-	node.MsgHandShake
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgHandShake) GetMsgType() MsgType {
-	return HANDSHAKE
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgHandShake) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgHandShake)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgHandShake) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgHandShake)
-}
-
-// ProtobufMsgHandShakeACK 握手消息回复
-type ProtobufMsgHandShakeACK struct {
-	node.MsgHandShakeACK
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgHandShakeACK) GetMsgType() MsgType {
-	return HANDSHAKEACK
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgHandShakeACK) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgHandShakeACK)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgHandShakeACK) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgHandShakeACK)
-}
-
-// ProtobufMsgError 错误消息
-type ProtobufMsgError struct {
-	node.MsgError
-}
-
-// GetMsgType 实现Message接口
-func (m *ProtobufMsgError) GetMsgType() MsgType {
-	return ERROR
-}
-
-// FromBytes 实现Message接口
-func (m *ProtobufMsgError) FromBytes(b []byte) error {
-	return proto.Unmarshal(b, &m.MsgError)
-}
-
-// ToBytes 实现Message接口
-func (m *ProtobufMsgError) ToBytes() (b []byte, err error) {
-	return proto.Marshal(&m.MsgError)
+// ParseHandShake 解析握手数据
+func (f *protoBufFactory) ParseHandShake(buf []byte) (h interface{}, err error) {
+	handshake := &phead.MsgHandShake{}
+	err = proto.Unmarshal(buf, handshake)
+	if err != nil {
+		return
+	}
+	h = handshake
+	return
 }

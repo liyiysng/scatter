@@ -41,26 +41,22 @@ func PackagePoolPut(p *Packet) {
 	pkgPool.Put(p)
 }
 
+// PacketOpt 消息选项
+type PacketOpt byte
+
+const (
+	// COMPRESS 是否压缩
+	COMPRESS PacketOpt = 0x01
+)
+
 // Packet 一个包含完整消息的数据包
 type Packet struct {
-	MsgType MsgType
-	MsgOpt  MsgOpt
-	Data    []byte
+	PacketOpt PacketOpt
+	Data      []byte
 }
 
 // ReadFrom 从reader中读取package
 func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLength int) (n int, err error) {
-
-	bType, err := r.ReadByte()
-	if err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return n, err
-	}
-	n++
-
-	p.MsgType = MsgType(bType)
 
 	bOpt, err := r.ReadByte()
 	if err != nil {
@@ -71,7 +67,7 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 	}
 	n++
 
-	p.MsgOpt = MsgOpt(bOpt)
+	p.PacketOpt = PacketOpt(bOpt)
 
 	dataLength := int32(-1)
 	err = binary.Read(r, binary.BigEndian, &dataLength)
@@ -90,7 +86,7 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 		if err != nil {
 			return n, err
 		}
-		if p.MsgOpt&COMPRESS > 0 { // 解压
+		if p.PacketOpt&COMPRESS > 0 { // 解压
 			r, err := compressor.Decompress(bytes.NewBuffer(buf))
 			if err != nil {
 				return n, err
@@ -117,7 +113,7 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 
 	bufToWrite := p.Data
 
-	if length > 0 && p.MsgOpt&COMPRESS > 0 { // 压缩
+	if length > 0 && p.PacketOpt&COMPRESS > 0 { // 压缩
 		compressBuf := util.BufferPoolGet()
 		defer util.BufferPoolPut(compressBuf)
 		wr, err := compresser.Compress(compressBuf)
@@ -133,12 +129,7 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 
 	lenghtToWrite := int32(len(bufToWrite))
 
-	err = w.WriteByte(byte(p.MsgType))
-	if err != nil {
-		return
-	}
-	n++
-	err = w.WriteByte(byte(p.MsgOpt))
+	err = w.WriteByte(byte(p.PacketOpt))
 	if err != nil {
 		return
 	}

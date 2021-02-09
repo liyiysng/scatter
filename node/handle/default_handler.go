@@ -335,7 +335,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, repor
 		}
 
 		// second arg need be a session
-		if argSession := mtype.In(2); argSession != s.SessionType {
+		if argSession := mtype.In(2); argSession != s.SessionType && !argSession.Implements(s.SessionType) {
 			if reportErr {
 				myLog.Errorf("method %s.%s first argument type not a session but a %v", srvName, mname, argSession)
 			}

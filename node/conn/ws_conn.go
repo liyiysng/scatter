@@ -89,7 +89,7 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 		return nil, err
 	}
 
-	msg, err = message.BuildMessage(p.MsgType, p.Data)
+	msg, err = message.MsgFactory.BuildMessage(p.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 }
 
 // WriteNextMessage 发送一个消息
-func (c *wsConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) error {
+func (c *wsConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) error {
 	buf, err := msg.ToBytes()
 	if err != nil {
 		return err
@@ -107,8 +107,7 @@ func (c *wsConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) er
 	}
 	p := message.PackagePoolGet()
 	defer message.PackagePoolPut(p)
-	p.MsgType = msg.GetMsgType()
-	p.MsgOpt = msgOpt
+	p.PacketOpt = popt
 	p.Data = buf
 
 	writeBuffer := util.BufferPoolGet()

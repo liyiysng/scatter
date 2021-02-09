@@ -5,6 +5,11 @@ import (
 
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
+
+	//json编码
+	_ "github.com/liyiysng/scatter/encoding/json"
+	//proto编码
+	_ "github.com/liyiysng/scatter/encoding/proto"
 )
 
 const (
@@ -36,6 +41,8 @@ type Options struct {
 	writeTimeout      time.Duration
 	// 压缩
 	compresser string
+	// 编码
+	codec string
 	// 限流
 	enableLimit bool
 	// 读限流
@@ -76,13 +83,20 @@ func (o *Options) getCompressor() encoding.Compressor {
 	return nil
 }
 
+func (o *Options) getCodec() encoding.Codec {
+	if o.codec != "" {
+		return encoding.GetCodec(o.codec)
+	}
+	return encoding.GetCodec("proto")
+}
+
 var defaultOptions = Options{
 	writeBufferSize:   defaultWriteBufSize,
 	readBufferSize:    defaultReadBufSize,
 	maxPayloadLength:  32 * 1024,
 	connectionTimeout: 120 * time.Second,
 	readTimeout:       0,
-	writeTimeout:      0,
+	writeTimeout:      time.Second * 5,
 	compresser:        "gzip",
 	enableLimit:       false,
 }

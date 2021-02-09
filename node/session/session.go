@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/logger"
+	"github.com/liyiysng/scatter/node/handle"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,6 +38,13 @@ type Session interface {
 	OnClose(onClose OnClose)
 	// session是否关闭
 	Closed() bool
+}
+
+// FrontendSession 前端Session
+type FrontendSession interface {
+	Session
+	Handle(srvHandler handle.IHandler)
+	Close()
 }
 
 // BackendSession 标识在内部节点session

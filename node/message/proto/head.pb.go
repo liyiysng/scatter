@@ -4,7 +4,7 @@
 // 	protoc        v3.14.0
 // source: node/head.proto
 
-package node
+package proto
 
 import (
 	proto "github.com/golang/protobuf/proto"
@@ -25,19 +25,20 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
-// 消息请求
-type MsgRequest struct {
+type Head struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Sequence int32  `protobuf:"varint,1,opt,name=Sequence,proto3" json:"Sequence,omitempty"` // 请求时由客户端填充 , 回复时由服务器设置相同序列
-	Service  string `protobuf:"bytes,2,opt,name=Service,proto3" json:"Service,omitempty"`    // 服务名称 如 Game.Foo
-	Payload  []byte `protobuf:"bytes,3,opt,name=Payload,proto3" json:"Payload,omitempty"`    // 数据
+	MsgType     int32  `protobuf:"varint,1,opt,name=MsgType,proto3" json:"MsgType,omitempty"`        // 消息类型
+	Sequence    int32  `protobuf:"varint,2,opt,name=Sequence,proto3" json:"Sequence,omitempty"`      // 请求时由客户端填充 , 回复时由服务器设置相同序列
+	Service     string `protobuf:"bytes,3,opt,name=Service,proto3" json:"Service,omitempty"`         // 服务名称 如 Game.Foo
+	CustomError string `protobuf:"bytes,4,opt,name=CustomError,proto3" json:"CustomError,omitempty"` // 自定义错误描述 货币不足等逻辑错误
+	Payload     []byte `protobuf:"bytes,5,opt,name=Payload,proto3" json:"Payload,omitempty"`         // 数据
 }
 
-func (x *MsgRequest) Reset() {
-	*x = MsgRequest{}
+func (x *Head) Reset() {
+	*x = Head{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_node_head_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -45,13 +46,13 @@ func (x *MsgRequest) Reset() {
 	}
 }
 
-func (x *MsgRequest) String() string {
+func (x *Head) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MsgRequest) ProtoMessage() {}
+func (*Head) ProtoMessage() {}
 
-func (x *MsgRequest) ProtoReflect() protoreflect.Message {
+func (x *Head) ProtoReflect() protoreflect.Message {
 	mi := &file_node_head_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -63,202 +64,40 @@ func (x *MsgRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MsgRequest.ProtoReflect.Descriptor instead.
-func (*MsgRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use Head.ProtoReflect.Descriptor instead.
+func (*Head) Descriptor() ([]byte, []int) {
 	return file_node_head_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MsgRequest) GetSequence() int32 {
+func (x *Head) GetMsgType() int32 {
+	if x != nil {
+		return x.MsgType
+	}
+	return 0
+}
+
+func (x *Head) GetSequence() int32 {
 	if x != nil {
 		return x.Sequence
 	}
 	return 0
 }
 
-func (x *MsgRequest) GetService() string {
+func (x *Head) GetService() string {
 	if x != nil {
 		return x.Service
 	}
 	return ""
 }
 
-func (x *MsgRequest) GetPayload() []byte {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
-// 消息回复
-type MsgResponse struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Sequence    int32  `protobuf:"varint,1,opt,name=Sequence,proto3" json:"Sequence,omitempty"`      // 请求时由客户端填充 , 回复时由服务器设置相同序列
-	Payload     []byte `protobuf:"bytes,2,opt,name=Payload,proto3" json:"Payload,omitempty"`         // 数据
-	CustomError string `protobuf:"bytes,3,opt,name=CustomError,proto3" json:"CustomError,omitempty"` //自定义错误描述 货币不足等逻辑错误. 当设置错误是,Payload无效
-}
-
-func (x *MsgResponse) Reset() {
-	*x = MsgResponse{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgResponse) ProtoMessage() {}
-
-func (x *MsgResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgResponse.ProtoReflect.Descriptor instead.
-func (*MsgResponse) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *MsgResponse) GetSequence() int32 {
-	if x != nil {
-		return x.Sequence
-	}
-	return 0
-}
-
-func (x *MsgResponse) GetPayload() []byte {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
-func (x *MsgResponse) GetCustomError() string {
+func (x *Head) GetCustomError() string {
 	if x != nil {
 		return x.CustomError
 	}
 	return ""
 }
 
-// 消息通知 客户端=>服务器
-type MsgNotify struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Service string `protobuf:"bytes,1,opt,name=Service,proto3" json:"Service,omitempty"` // 服务名称 如 Game.Foo
-	Payload []byte `protobuf:"bytes,2,opt,name=Payload,proto3" json:"Payload,omitempty"` // 数据
-}
-
-func (x *MsgNotify) Reset() {
-	*x = MsgNotify{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgNotify) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgNotify) ProtoMessage() {}
-
-func (x *MsgNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgNotify.ProtoReflect.Descriptor instead.
-func (*MsgNotify) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *MsgNotify) GetService() string {
-	if x != nil {
-		return x.Service
-	}
-	return ""
-}
-
-func (x *MsgNotify) GetPayload() []byte {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
-// 消息推送 服务器=>客户端
-type MsgPush struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Command string `protobuf:"bytes,1,opt,name=Command,proto3" json:"Command,omitempty"`
-	Payload []byte `protobuf:"bytes,2,opt,name=Payload,proto3" json:"Payload,omitempty"` // 数据
-}
-
-func (x *MsgPush) Reset() {
-	*x = MsgPush{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgPush) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgPush) ProtoMessage() {}
-
-func (x *MsgPush) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgPush.ProtoReflect.Descriptor instead.
-func (*MsgPush) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *MsgPush) GetCommand() string {
-	if x != nil {
-		return x.Command
-	}
-	return ""
-}
-
-func (x *MsgPush) GetPayload() []byte {
+func (x *Head) GetPayload() []byte {
 	if x != nil {
 		return x.Payload
 	}
@@ -276,7 +115,7 @@ type MsgHeartbeat struct {
 func (x *MsgHeartbeat) Reset() {
 	*x = MsgHeartbeat{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[4]
+		mi := &file_node_head_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -289,7 +128,7 @@ func (x *MsgHeartbeat) String() string {
 func (*MsgHeartbeat) ProtoMessage() {}
 
 func (x *MsgHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[4]
+	mi := &file_node_head_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -302,7 +141,7 @@ func (x *MsgHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgHeartbeat.ProtoReflect.Descriptor instead.
 func (*MsgHeartbeat) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{4}
+	return file_node_head_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *MsgHeartbeat) GetTimeStamp() int64 {
@@ -323,7 +162,7 @@ type MsgHeartbeatACK struct {
 func (x *MsgHeartbeatACK) Reset() {
 	*x = MsgHeartbeatACK{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[5]
+		mi := &file_node_head_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -336,7 +175,7 @@ func (x *MsgHeartbeatACK) String() string {
 func (*MsgHeartbeatACK) ProtoMessage() {}
 
 func (x *MsgHeartbeatACK) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[5]
+	mi := &file_node_head_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -349,7 +188,7 @@ func (x *MsgHeartbeatACK) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgHeartbeatACK.ProtoReflect.Descriptor instead.
 func (*MsgHeartbeatACK) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{5}
+	return file_node_head_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MsgHeartbeatACK) GetTimeStamp() int64 {
@@ -372,7 +211,7 @@ type MsgHandShake struct {
 func (x *MsgHandShake) Reset() {
 	*x = MsgHandShake{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[6]
+		mi := &file_node_head_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -385,7 +224,7 @@ func (x *MsgHandShake) String() string {
 func (*MsgHandShake) ProtoMessage() {}
 
 func (x *MsgHandShake) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[6]
+	mi := &file_node_head_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -398,7 +237,7 @@ func (x *MsgHandShake) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgHandShake.ProtoReflect.Descriptor instead.
 func (*MsgHandShake) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{6}
+	return file_node_head_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *MsgHandShake) GetPlatform() string {
@@ -433,7 +272,7 @@ type MsgHandShakeACK struct {
 func (x *MsgHandShakeACK) Reset() {
 	*x = MsgHandShakeACK{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[7]
+		mi := &file_node_head_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -446,7 +285,7 @@ func (x *MsgHandShakeACK) String() string {
 func (*MsgHandShakeACK) ProtoMessage() {}
 
 func (x *MsgHandShakeACK) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[7]
+	mi := &file_node_head_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -459,7 +298,7 @@ func (x *MsgHandShakeACK) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgHandShakeACK.ProtoReflect.Descriptor instead.
 func (*MsgHandShakeACK) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{7}
+	return file_node_head_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MsgHandShakeACK) GetTimeStamp() int64 {
@@ -480,7 +319,7 @@ type MsgError struct {
 func (x *MsgError) Reset() {
 	*x = MsgError{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[8]
+		mi := &file_node_head_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -493,7 +332,7 @@ func (x *MsgError) String() string {
 func (*MsgError) ProtoMessage() {}
 
 func (x *MsgError) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[8]
+	mi := &file_node_head_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -506,7 +345,7 @@ func (x *MsgError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgError.ProtoReflect.Descriptor instead.
 func (*MsgError) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{8}
+	return file_node_head_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *MsgError) GetErrorInfo() string {
@@ -521,26 +360,15 @@ var File_node_head_proto protoreflect.FileDescriptor
 var file_node_head_proto_rawDesc = []byte{
 	0x0a, 0x0f, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x68, 0x65, 0x61, 0x64, 0x2e, 0x70, 0x72, 0x6f, 0x74,
 	0x6f, 0x12, 0x12, 0x73, 0x63, 0x61, 0x74, 0x74, 0x65, 0x72, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x5c, 0x0a, 0x0a, 0x4d, 0x73, 0x67, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x1a, 0x0a, 0x08, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x12,
-	0x18, 0x0a, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x50, 0x61, 0x79,
-	0x6c, 0x6f, 0x61, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c,
-	0x6f, 0x61, 0x64, 0x22, 0x65, 0x0a, 0x0b, 0x4d, 0x73, 0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x53, 0x65, 0x71, 0x75, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x18,
-	0x0a, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52,
-	0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x12, 0x20, 0x0a, 0x0b, 0x43, 0x75, 0x73, 0x74,
-	0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x43,
-	0x75, 0x73, 0x74, 0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x22, 0x3f, 0x0a, 0x09, 0x4d, 0x73,
-	0x67, 0x4e, 0x6f, 0x74, 0x69, 0x66, 0x79, 0x12, 0x18, 0x0a, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69,
-	0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x12, 0x18, 0x0a, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x3d, 0x0a, 0x07, 0x4d,
-	0x73, 0x67, 0x50, 0x75, 0x73, 0x68, 0x12, 0x18, 0x0a, 0x07, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e,
-	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64,
-	0x12, 0x18, 0x0a, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x92, 0x01, 0x0a, 0x04, 0x48, 0x65, 0x61, 0x64, 0x12, 0x18,
+	0x0a, 0x07, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x07, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x53, 0x65, 0x71, 0x75,
+	0x65, 0x6e, 0x63, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x08, 0x53, 0x65, 0x71, 0x75,
+	0x65, 0x6e, 0x63, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x20,
+	0x0a, 0x0b, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0b, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72,
+	0x12, 0x18, 0x0a, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28,
 	0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x2c, 0x0a, 0x0c, 0x4d, 0x73,
 	0x67, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x54, 0x69,
 	0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x54,
@@ -560,9 +388,9 @@ var file_node_head_proto_rawDesc = []byte{
 	0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x54, 0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70,
 	0x22, 0x28, 0x0a, 0x08, 0x4d, 0x73, 0x67, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x1c, 0x0a, 0x09,
 	0x65, 0x72, 0x72, 0x6f, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x42, 0x0f, 0x5a, 0x0d, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x42, 0x14, 0x5a, 0x12, 0x6e, 0x6f,
+	0x64, 0x65, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -577,17 +405,14 @@ func file_node_head_proto_rawDescGZIP() []byte {
 	return file_node_head_proto_rawDescData
 }
 
-var file_node_head_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_node_head_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_node_head_proto_goTypes = []interface{}{
-	(*MsgRequest)(nil),      // 0: scatter.node.proto.MsgRequest
-	(*MsgResponse)(nil),     // 1: scatter.node.proto.MsgResponse
-	(*MsgNotify)(nil),       // 2: scatter.node.proto.MsgNotify
-	(*MsgPush)(nil),         // 3: scatter.node.proto.MsgPush
-	(*MsgHeartbeat)(nil),    // 4: scatter.node.proto.MsgHeartbeat
-	(*MsgHeartbeatACK)(nil), // 5: scatter.node.proto.MsgHeartbeatACK
-	(*MsgHandShake)(nil),    // 6: scatter.node.proto.MsgHandShake
-	(*MsgHandShakeACK)(nil), // 7: scatter.node.proto.MsgHandShakeACK
-	(*MsgError)(nil),        // 8: scatter.node.proto.MsgError
+	(*Head)(nil),            // 0: scatter.node.proto.Head
+	(*MsgHeartbeat)(nil),    // 1: scatter.node.proto.MsgHeartbeat
+	(*MsgHeartbeatACK)(nil), // 2: scatter.node.proto.MsgHeartbeatACK
+	(*MsgHandShake)(nil),    // 3: scatter.node.proto.MsgHandShake
+	(*MsgHandShakeACK)(nil), // 4: scatter.node.proto.MsgHandShakeACK
+	(*MsgError)(nil),        // 5: scatter.node.proto.MsgError
 }
 var file_node_head_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -604,7 +429,7 @@ func file_node_head_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_node_head_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgRequest); i {
+			switch v := v.(*Head); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -616,42 +441,6 @@ func file_node_head_proto_init() {
 			}
 		}
 		file_node_head_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgNotify); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgPush); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgHeartbeat); i {
 			case 0:
 				return &v.state
@@ -663,7 +452,7 @@ func file_node_head_proto_init() {
 				return nil
 			}
 		}
-		file_node_head_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_node_head_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgHeartbeatACK); i {
 			case 0:
 				return &v.state
@@ -675,7 +464,7 @@ func file_node_head_proto_init() {
 				return nil
 			}
 		}
-		file_node_head_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_node_head_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgHandShake); i {
 			case 0:
 				return &v.state
@@ -687,7 +476,7 @@ func file_node_head_proto_init() {
 				return nil
 			}
 		}
-		file_node_head_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_node_head_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgHandShakeACK); i {
 			case 0:
 				return &v.state
@@ -699,7 +488,7 @@ func file_node_head_proto_init() {
 				return nil
 			}
 		}
-		file_node_head_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_node_head_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgError); i {
 			case 0:
 				return &v.state
@@ -718,7 +507,7 @@ func file_node_head_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_node_head_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +22,7 @@ type Option struct {
 	ReqChanSize int
 	ResChanSize int
 	// 获取消息选项 , 如某些消息需要压缩等
-	GetMessageOpt func(msg message.Message) message.MsgOpt
+	GetMessageOpt func(msg message.Message) message.PacketOpt
 	// 请求消息处理
 	ReqHandle handle.RequestHandler
 	// 消息拦截
@@ -116,7 +117,7 @@ func putMsgCtx(mctx *msgCtx) {
 
 type frontendSession struct {
 	nid string
-	opt Option
+	opt *Option
 
 	conn       conn.MsgConn
 	connClosed bool
@@ -142,7 +143,7 @@ type frontendSession struct {
 }
 
 // NewFrontendSession 创建一个session
-func NewFrontendSession(nid string, c conn.MsgConn, opt Option) Session {
+func NewFrontendSession(nid string, c conn.MsgConn, opt *Option) FrontendSession {
 	ret := &frontendSession{
 		nid:        nid,
 		conn:       c,
@@ -175,7 +176,12 @@ func (s *frontendSession) Push(ctx context.Context, cmd string, data []byte) err
 		return constants.ErrSessionClosed
 	}
 	mctx := getMsgCtxWithContext(ctx)
-	mctx.msgWrite = message.BuildPushMessage(cmd, data)
+
+	var err error
+	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
+	if err != nil {
+		return err
+	}
 
 	return s.push(mctx)
 }
@@ -211,7 +217,12 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, data []by
 		return constants.ErrSessionClosed
 	}
 	mctx := getMsgCtxWithContext(ctx)
-	mctx.msgWrite = message.BuildPushMessage(cmd, data)
+
+	var err error
+	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
+	if err != nil {
+		return err
+	}
 
 	mctx.WithTimeout(timeout)
 
@@ -225,7 +236,12 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, data 
 	}
 
 	mctx := getMsgCtxWithContext(ctx)
-	mctx.msgWrite = message.BuildPushMessage(cmd, data)
+
+	var err error
+	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
+	if err != nil {
+		return err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -266,7 +282,7 @@ func (s *frontendSession) Close() {
 	s.closeEvent.Fire()
 }
 
-func (s *frontendSession) handle(srvHandler handle.IHandler) {
+func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 
 	tick := time.NewTicker(s.opt.KeepAlive)
 	defer tick.Stop()
@@ -310,9 +326,14 @@ func (s *frontendSession) handle(srvHandler handle.IHandler) {
 	// 退出条件
 	// 1.当处理完所有请求后退出(reqChan关闭是退出该协程)
 	// 2.遇到关键错误
+	// 3.关闭事件
 	for {
 
 		select {
+		case <-s.closeEvent.Done():
+			{
+				return
+			}
 		case mctx, ok := <-s.readChan: // 处理消息
 			{
 				if !ok { // reqChan closed
@@ -362,14 +383,14 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 	switch mctx.msgRead.GetMsgType() {
 	case message.NOTIFY:
 		{
-			reqMsg := mctx.msgRead.(*message.ProtobufMsgNotify)
+			reqMsg := mctx.msgRead
 
-			serviceName, methodName, err := message.GetSrvMethod(reqMsg.Service)
+			serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
 			if err != nil {
 				return handle.NewCriticalErrorWithError(err)
 			}
 
-			err = srvHandler.Notify(mctx.ctx, s, serviceName, methodName, reqMsg.Payload)
+			err = srvHandler.Notify(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
 
 			if err != nil {
 				return err
@@ -378,20 +399,23 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		}
 	case message.REQUEST:
 		{
-			reqMsg := mctx.msgRead.(*message.ProtobufMsgRequest)
+			reqMsg := mctx.msgRead
 
-			serviceName, methodName, err := message.GetSrvMethod(reqMsg.Service)
+			serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
 			if err != nil {
 				return handle.NewCriticalErrorWithError(err)
 			}
 
-			resBuf, err := srvHandler.Call(mctx.ctx, s, serviceName, methodName, reqMsg.Payload)
+			resBuf, err := srvHandler.Call(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
 
 			if err != nil {
 				if customErr, ok := err.(handle.ICustomError); ok {
 					// 非关键错误
 					// 回复客户端
-					mctx.msgWrite = message.BuildResponseCustomErrorMessage(reqMsg.Sequence, customErr.Error())
+					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(reqMsg.GetSequence(), customErr.Error())
+					if err != nil {
+						return err
+					}
 					err = s.sendWrite(mctx)
 					if err != nil {
 						return err
@@ -401,7 +425,10 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			}
 
 			// 回复客户端
-			mctx.msgWrite = message.BuildResponseMessage(reqMsg.Sequence, resBuf)
+			mctx.msgWrite, err = message.MsgFactory.BuildResponseMessage(reqMsg.GetSequence(), resBuf)
+			if err != nil {
+				return err
+			}
 			err = s.sendWrite(mctx)
 			if err != nil {
 				return err
@@ -411,8 +438,12 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		{
 			s.lastHeartBeat = time.Now()
 			// write ack
-			mctx.msgWrite = message.BuildHeatAckMessage()
-			err := s.sendWrite(mctx)
+			var err error
+			mctx.msgWrite, err = message.MsgFactory.BuildHeatAckMessage()
+			if err != nil {
+				return err
+			}
+			err = s.sendWrite(mctx)
 			if err != nil {
 				return err
 			}
@@ -423,13 +454,19 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 				return handle.NewCriticalError("dupulicate handshake")
 			}
 
-			handShake := mctx.msgRead.(*message.ProtobufMsgHandShake)
-			s.opt.Logger.Infof("hand shake %v", handShake)
-			//
-			s.handShake = handShake
+			handShake := mctx.msgRead
+			h, err := message.MsgFactory.ParseHandShake(handShake.GetPayload())
+			if err != nil {
+				return err
+			}
+			s.handShake = h
+			//s.opt.Logger.Infof("handshake %v", s.handShake)
 			// write ack
-			mctx.msgWrite = message.BuildHandShakeAckMessage()
-			err := s.sendWrite(mctx)
+			mctx.msgWrite, err = message.MsgFactory.BuildHandShakeAckMessage()
+			if err != nil {
+				return err
+			}
+			err = s.sendWrite(mctx)
 			if err != nil {
 				return err
 			}
@@ -462,6 +499,8 @@ func (s *frontendSession) sendWrite(mctx *msgCtx) error {
 func (s *frontendSession) runWrite() {
 	defer func() {
 		s.Close()
+		// 关闭链接
+		s.closeConn()
 	}()
 
 	cacheMsgNum := 0
@@ -475,8 +514,6 @@ func (s *frontendSession) runWrite() {
 			{
 				// 确保所有消息已被正确发送
 				s.drainWrite()
-				// 关闭链接
-				s.closeConn()
 				return
 			}
 		case mctx, ok := <-s.writeChan:
@@ -562,7 +599,7 @@ func (s *frontendSession) runRead() {
 	for {
 		msg, err := s.conn.ReadNextMessage()
 		if err != nil {
-			if err != io.EOF && err != io.ErrUnexpectedEOF {
+			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {
 				s.opt.Logger.Errorf("read message error %v", err)
 			}
 			// io err 关闭链接
@@ -591,6 +628,12 @@ func (s *frontendSession) runRead() {
 }
 
 func (s *frontendSession) drainWrite() {
+
+	s.opt.Logger.Info("[frontendSession.drainWrite]")
+
+	defer func() {
+		s.opt.Logger.Info("[frontendSession.drainWrite] leave")
+	}()
 
 	var err error
 
@@ -635,6 +678,8 @@ func (s *frontendSession) closeConn() {
 	if s.connClosed {
 		return
 	}
+
+	s.opt.Logger.Info("close conn")
 
 	// 关闭链接
 	err := s.conn.Close()

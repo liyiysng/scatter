@@ -2,7 +2,9 @@
 package node
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -13,8 +15,15 @@ import (
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/acceptor"
 	"github.com/liyiysng/scatter/node/conn"
+	"github.com/liyiysng/scatter/node/handle"
+	"github.com/liyiysng/scatter/node/message"
+	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/util"
 	"golang.org/x/net/trace"
+)
+
+var (
+	myLog = logger.Component("node")
 )
 
 // SocketProtcol 协议类型
@@ -34,7 +43,7 @@ type errStore struct {
 
 // Node represent
 type Node struct {
-	sync.RWMutex
+	mu sync.RWMutex
 	// session ID
 	sIDSequence int64
 	// 选项
@@ -45,7 +54,7 @@ type Node struct {
 	startTime time.Time
 
 	// 所有链接
-	conns map[conn.MsgConn]bool
+	sessions map[int64]session.FrontendSession
 
 	// 监听对象
 	accs map[acceptor.Acceptor]bool
@@ -78,7 +87,7 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 		accs:      make(map[acceptor.Acceptor]bool),
 		opts:      opts,
 		startTime: time.Now(),
-		conns:     make(map[conn.MsgConn]bool),
+		sessions:  make(map[int64]session.FrontendSession),
 		quit:      util.NewEvent(),
 	}
 
@@ -103,13 +112,13 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 	n.waitGroup.Add(1)
 	defer n.waitGroup.Done()
 
-	n.Lock()
+	n.mu.Lock()
 	n.trEventLogf("starting")
 	n.started = true
 
 	if n.accs == nil {
 		// Start called after Stop
-		n.Unlock()
+		n.mu.Unlock()
 		return constants.ErrNodeStopped
 	}
 
@@ -118,7 +127,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 
 	if len(cert) > 0 {
 		if len(cert) != 2 {
-			n.Unlock()
+			n.mu.Unlock()
 			return constants.ErrInvalidCertificates
 		}
 		certFile = cert[0]
@@ -164,31 +173,31 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 	} else if sp == SocketProtcolWS {
 		acc = acceptor.NewWSAcceptor(accOpt)
 	} else {
-		n.Unlock()
+		n.mu.Unlock()
 		return fmt.Errorf("[Node.Serve] unsupport socket protcol %s", sp)
 	}
 	n.accs[acc] = true
-	n.Unlock()
+	n.mu.Unlock()
 
 	defer func() {
-		n.Lock()
+		n.mu.Lock()
 		if n.accs != nil && n.accs[acc] {
 			delete(n.accs, acc)
 		}
-		n.Unlock()
+		n.mu.Unlock()
 	}()
 
-	n.Lock()
+	n.mu.Lock()
 	n.trEventLogf("[Node.Serve] protcol:%s addr %s", sp, addr)
-	n.Unlock()
+	n.mu.Unlock()
 
 	// accept go
 	n.waitGroup.Wrap(
 		func() {
 			err := acc.ListenAndServe()
-			n.Lock()
+			n.mu.Lock()
 			n.trEventLogf("[Node.Serve] done serve protcol:%s addr %s", sp, addr)
-			n.Unlock()
+			n.mu.Unlock()
 			if err != nil {
 				n.opts.Logger.Errorf("[Node.Serve] node %v stop %v", n.opts.ID, err)
 			}
@@ -202,9 +211,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 			{
 				if ok {
 					//handel conn go
-					n.waitGroup.Wrap(func() {
-						n.handleConn(c)
-					}, n.opts.Logger.Errorf)
+					n.waitGroup.Wrap(func() { n.handleConn(c) }, n.opts.Logger.Errorf)
 				} else {
 					return nil
 				}
@@ -215,32 +222,40 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 
 // Stop 停止/关闭该节点
 func (n *Node) Stop() {
+
+	if n.quit.HasFired() {
+		return
+	}
+
+	n.opts.Logger.Infof("stopping node %s", n.opts.ID)
+
 	n.quit.Fire()
 
 	defer func() {
 		n.waitGroup.Wait()
+		n.opts.Logger.Infof("node %s stoped", n.opts.ID)
 	}()
 
-	n.Lock()
+	n.mu.Lock()
 	accs := n.accs
 	n.accs = nil
-	conns := n.conns
-	n.conns = nil
-	n.Unlock()
+	ss := n.sessions
+	n.sessions = nil
+	n.mu.Unlock()
 
 	for acc := range accs {
 		acc.Stop()
 	}
-	for c := range conns {
+	for _, c := range ss {
 		c.Close()
 	}
 
-	n.Lock()
+	n.mu.Lock()
 	if n.trEvents != nil {
 		n.trEvents.Finish()
 		n.trEvents = nil
 	}
-	n.Unlock()
+	n.mu.Unlock()
 }
 
 // 记录事件日志
@@ -265,9 +280,9 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		return
 	}
 
-	n.Lock()
+	n.mu.Lock()
 	n.trEventLogf("[Node.handleConn] new connection local:%v remote:%v", conn.LocalAddr(), conn.RemoteAddr())
-	n.Unlock()
+	n.mu.Unlock()
 
 	//指标:链接数
 	if n.opts.metricsConnCountEnabled() {
@@ -276,4 +291,74 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	}
 
 	// 创建session
+	s := session.NewFrontendSession(n.opts.ID, conn, &session.Option{
+		Logger:            n.opts.Logger,
+		ReqChanSize:       0,
+		ResChanSize:       0,
+		GetMessageOpt:     func(msg message.Message) message.PacketOpt { return 0 },
+		ReqHandle:         nil,
+		ReqInterceptor:    nil,
+		PushInterceptor:   nil,
+		NofityHandle:      nil,
+		NotifyInterceptor: nil,
+		OnMsgFinish:       func(ctx context.Context) { n.opts.Logger.Info("message finished.") },
+		MsgHandleTimeOut:  0,
+		MsgMaxLiveTime:    time.Second * 5,
+		EnableProfile:     false,
+		EnableBlobLog:     false,
+		KeepAlive:         time.Minute * 5,
+		MaxMsgCacheNum:    3,
+	})
+
+	n.opts.Logger.Infof("new connect %v comming", s.Stats().RemoteAddress)
+
+	n.mu.Lock()
+	if n.sessions == nil { // stoped
+		n.mu.Unlock()
+		return
+	}
+	n.sessions[s.Stats().SID] = s
+	n.mu.Unlock()
+
+	defer func() {
+		n.opts.Logger.Infof("connect %v leave", s.Stats().RemoteAddress)
+		n.mu.Lock()
+		if n.sessions == nil { // stoped
+			n.mu.Unlock()
+			return
+		}
+		delete(n.sessions, s.Stats().SID)
+		n.mu.Unlock()
+	}()
+
+	s.Handle(handle.NewServiceHandle(&handle.Option{
+		Codec:            n.opts.getCodec(),
+		ReqTypeValidator: func(reqType reflect.Type) error { return nil },
+		ResTypeValidator: func(reqType reflect.Type) error { return nil },
+		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
+		HookCall:         n.onCall,
+		HookNofify:       n.onNotify,
+	}))
+}
+
+func (n *Node) onCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {
+
+	beg := time.Now()
+
+	res, err := caller(req)
+
+	n.opts.Logger.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
+
+	return err
+}
+
+func (n *Node) onNotify(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error {
+
+	beg := time.Now()
+
+	err := caller(req)
+
+	n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
+
+	return err
 }

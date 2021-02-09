@@ -62,7 +62,7 @@ func (c *tcpConn) ReadNextMessage() (msg message.Message, err error) {
 		return nil, err
 	}
 
-	msg, err = message.BuildMessage(p.MsgType, p.Data)
+	msg, err = message.MsgFactory.BuildMessage(p.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *tcpConn) Flush() error {
 }
 
 // WriteNextMessage 发送一个消息
-func (c *tcpConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) error {
+func (c *tcpConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) error {
 	buf, err := msg.ToBytes()
 	if err != nil {
 		return err
@@ -85,8 +85,7 @@ func (c *tcpConn) WriteNextMessage(msg message.Message, msgOpt message.MsgOpt) e
 	}
 	p := message.PackagePoolGet()
 	defer message.PackagePoolPut(p)
-	p.MsgType = msg.GetMsgType()
-	p.MsgOpt = msgOpt
+	p.PacketOpt = popt
 	p.Data = buf
 
 	if c.opt.WriteTimeout != 0 {
