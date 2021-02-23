@@ -104,100 +104,6 @@ func (x *Head) GetPayload() []byte {
 	return nil
 }
 
-type MsgHeartbeat struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	TimeStamp int64 `protobuf:"varint,1,opt,name=TimeStamp,proto3" json:"TimeStamp,omitempty"`
-}
-
-func (x *MsgHeartbeat) Reset() {
-	*x = MsgHeartbeat{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgHeartbeat) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgHeartbeat) ProtoMessage() {}
-
-func (x *MsgHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgHeartbeat.ProtoReflect.Descriptor instead.
-func (*MsgHeartbeat) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *MsgHeartbeat) GetTimeStamp() int64 {
-	if x != nil {
-		return x.TimeStamp
-	}
-	return 0
-}
-
-type MsgHeartbeatACK struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	TimeStamp int64 `protobuf:"varint,1,opt,name=TimeStamp,proto3" json:"TimeStamp,omitempty"`
-}
-
-func (x *MsgHeartbeatACK) Reset() {
-	*x = MsgHeartbeatACK{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgHeartbeatACK) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgHeartbeatACK) ProtoMessage() {}
-
-func (x *MsgHeartbeatACK) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgHeartbeatACK.ProtoReflect.Descriptor instead.
-func (*MsgHeartbeatACK) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *MsgHeartbeatACK) GetTimeStamp() int64 {
-	if x != nil {
-		return x.TimeStamp
-	}
-	return 0
-}
-
 type MsgHandShake struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -211,7 +117,7 @@ type MsgHandShake struct {
 func (x *MsgHandShake) Reset() {
 	*x = MsgHandShake{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[3]
+		mi := &file_node_head_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -224,7 +130,7 @@ func (x *MsgHandShake) String() string {
 func (*MsgHandShake) ProtoMessage() {}
 
 func (x *MsgHandShake) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[3]
+	mi := &file_node_head_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -237,7 +143,7 @@ func (x *MsgHandShake) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgHandShake.ProtoReflect.Descriptor instead.
 func (*MsgHandShake) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{3}
+	return file_node_head_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *MsgHandShake) GetPlatform() string {
@@ -261,53 +167,6 @@ func (x *MsgHandShake) GetBuildVersion() string {
 	return ""
 }
 
-type MsgHandShakeACK struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	TimeStamp int64 `protobuf:"varint,1,opt,name=TimeStamp,proto3" json:"TimeStamp,omitempty"`
-}
-
-func (x *MsgHandShakeACK) Reset() {
-	*x = MsgHandShakeACK{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[4]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MsgHandShakeACK) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MsgHandShakeACK) ProtoMessage() {}
-
-func (x *MsgHandShakeACK) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[4]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MsgHandShakeACK.ProtoReflect.Descriptor instead.
-func (*MsgHandShakeACK) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *MsgHandShakeACK) GetTimeStamp() int64 {
-	if x != nil {
-		return x.TimeStamp
-	}
-	return 0
-}
-
 type MsgError struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -319,7 +178,7 @@ type MsgError struct {
 func (x *MsgError) Reset() {
 	*x = MsgError{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_node_head_proto_msgTypes[5]
+		mi := &file_node_head_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -332,7 +191,7 @@ func (x *MsgError) String() string {
 func (*MsgError) ProtoMessage() {}
 
 func (x *MsgError) ProtoReflect() protoreflect.Message {
-	mi := &file_node_head_proto_msgTypes[5]
+	mi := &file_node_head_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +204,7 @@ func (x *MsgError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgError.ProtoReflect.Descriptor instead.
 func (*MsgError) Descriptor() ([]byte, []int) {
-	return file_node_head_proto_rawDescGZIP(), []int{5}
+	return file_node_head_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MsgError) GetErrorInfo() string {
@@ -369,23 +228,14 @@ var file_node_head_proto_rawDesc = []byte{
 	0x0a, 0x0b, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x04, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x0b, 0x43, 0x75, 0x73, 0x74, 0x6f, 0x6d, 0x45, 0x72, 0x72, 0x6f, 0x72,
 	0x12, 0x18, 0x0a, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28,
-	0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x2c, 0x0a, 0x0c, 0x4d, 0x73,
-	0x67, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x54, 0x69,
-	0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x54,
-	0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x22, 0x2f, 0x0a, 0x0f, 0x4d, 0x73, 0x67, 0x48,
-	0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x41, 0x43, 0x4b, 0x12, 0x1c, 0x0a, 0x09, 0x54,
-	0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09,
-	0x54, 0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x22, 0x74, 0x0a, 0x0c, 0x4d, 0x73, 0x67,
-	0x48, 0x61, 0x6e, 0x64, 0x53, 0x68, 0x61, 0x6b, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x50, 0x6c, 0x61,
-	0x74, 0x66, 0x6f, 0x72, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x50, 0x6c, 0x61,
-	0x74, 0x66, 0x6f, 0x72, 0x6d, 0x12, 0x24, 0x0a, 0x0d, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x56,
-	0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x43, 0x6c,
-	0x69, 0x65, 0x6e, 0x74, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x22, 0x0a, 0x0c, 0x42,
-	0x75, 0x69, 0x6c, 0x64, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x0c, 0x42, 0x75, 0x69, 0x6c, 0x64, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22,
-	0x2f, 0x0a, 0x0f, 0x4d, 0x73, 0x67, 0x48, 0x61, 0x6e, 0x64, 0x53, 0x68, 0x61, 0x6b, 0x65, 0x41,
-	0x43, 0x4b, 0x12, 0x1c, 0x0a, 0x09, 0x54, 0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x09, 0x54, 0x69, 0x6d, 0x65, 0x53, 0x74, 0x61, 0x6d, 0x70,
+	0x0c, 0x52, 0x07, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22, 0x74, 0x0a, 0x0c, 0x4d, 0x73,
+	0x67, 0x48, 0x61, 0x6e, 0x64, 0x53, 0x68, 0x61, 0x6b, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x50, 0x6c,
+	0x61, 0x74, 0x66, 0x6f, 0x72, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x50, 0x6c,
+	0x61, 0x74, 0x66, 0x6f, 0x72, 0x6d, 0x12, 0x24, 0x0a, 0x0d, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74,
+	0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x43,
+	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x22, 0x0a, 0x0c,
+	0x42, 0x75, 0x69, 0x6c, 0x64, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x0c, 0x42, 0x75, 0x69, 0x6c, 0x64, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e,
 	0x22, 0x28, 0x0a, 0x08, 0x4d, 0x73, 0x67, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x1c, 0x0a, 0x09,
 	0x65, 0x72, 0x72, 0x6f, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x42, 0x14, 0x5a, 0x12, 0x6e, 0x6f,
@@ -405,14 +255,11 @@ func file_node_head_proto_rawDescGZIP() []byte {
 	return file_node_head_proto_rawDescData
 }
 
-var file_node_head_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_node_head_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_node_head_proto_goTypes = []interface{}{
-	(*Head)(nil),            // 0: scatter.node.proto.Head
-	(*MsgHeartbeat)(nil),    // 1: scatter.node.proto.MsgHeartbeat
-	(*MsgHeartbeatACK)(nil), // 2: scatter.node.proto.MsgHeartbeatACK
-	(*MsgHandShake)(nil),    // 3: scatter.node.proto.MsgHandShake
-	(*MsgHandShakeACK)(nil), // 4: scatter.node.proto.MsgHandShakeACK
-	(*MsgError)(nil),        // 5: scatter.node.proto.MsgError
+	(*Head)(nil),         // 0: scatter.node.proto.Head
+	(*MsgHandShake)(nil), // 1: scatter.node.proto.MsgHandShake
+	(*MsgError)(nil),     // 2: scatter.node.proto.MsgError
 }
 var file_node_head_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -441,30 +288,6 @@ func file_node_head_proto_init() {
 			}
 		}
 		file_node_head_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgHeartbeat); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgHeartbeatACK); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgHandShake); i {
 			case 0:
 				return &v.state
@@ -476,19 +299,7 @@ func file_node_head_proto_init() {
 				return nil
 			}
 		}
-		file_node_head_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MsgHandShakeACK); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_node_head_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_node_head_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*MsgError); i {
 			case 0:
 				return &v.state
@@ -507,7 +318,7 @@ func file_node_head_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_node_head_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/message"
+	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/node/textlog"
 )
 
@@ -153,4 +155,33 @@ func TestNodeHandShake(t *testing.T) {
 	}
 
 	time.Sleep(time.Second * 2)
+}
+
+type ServiceTest struct {
+}
+
+func (srv *ServiceTest) Sum(ctx context.Context, session session.Session, req *TestReq) {
+
+}
+
+func TestNodeService(t *testing.T) {
+
+	// start node
+	sink, err := textlog.NewTempFileSink()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := NewNode(EnableTextLog(sink))
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		err = n.Serve(SocketProtcolTCP, "127.0.0.1:7788")
+		if err != nil {
+			myLog.Error(err)
+			return
+		}
+		myLog.Info("node Serve finished")
+	}()
 }

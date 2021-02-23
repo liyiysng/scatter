@@ -48,8 +48,6 @@ type Node struct {
 	sIDSequence int64
 	// 选项
 	opts Options
-	// 当前错误(最后一个错误)
-	errValue atomic.Value
 	// 开启时间
 	startTime time.Time
 
@@ -65,9 +63,11 @@ type Node struct {
 	waitGroup util.WaitGroupWrapper
 	// trace
 	trEvents trace.EventLog
+	// 处理
+	srvHandle handle.IHandler
 
-	// 标识是否启动
-	started bool
+	// 标识是否服务
+	serve bool
 }
 
 // NewNode 新建节点
@@ -95,16 +95,53 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 		quit:      util.NewEvent(),
 	}
 
+	n.srvHandle = handle.NewServiceHandle(&handle.Option{
+		Codec:            n.opts.getCodec(),
+		ReqTypeValidator: n.opts.reqTypeValidator,
+		ResTypeValidator: n.opts.resTypeValidator,
+		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
+		HookCall:         n.onCall,
+		HookNofify:       n.onNotify,
+	})
+
 	if opts.enableEventTrace {
 		_, file, line, _ := runtime.Caller(1)
 		n.trEvents = trace.NewEventLog("scatter.Node", fmt.Sprintf("%s-%s:%d", opts.ID, file, line))
 	}
 
-	n.errValue.Store(&errStore{})
-
 	opts.Logger.Infof("start node %s", opts.ID)
 
 	return
+}
+
+// Register 注册服务
+func (n *Node) Register(recv interface{}) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.accs == nil {
+		return constants.ErrNodeStopped
+	}
+
+	if n.serve {
+		return fmt.Errorf("[Node.Register] register service after Node.Serve")
+	}
+
+	return n.srvHandle.Register(recv)
+}
+
+// RegisterName 注册命名服务
+func (n *Node) RegisterName(name string, recv interface{}) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.accs == nil {
+		return constants.ErrNodeStopped
+	}
+
+	if n.serve {
+		return fmt.Errorf("[Node.Register] register service after Node.Serve %q", name)
+	}
+
+	return n.srvHandle.RegisterName(name, recv)
 }
 
 // Serve 启动一个Serve
@@ -118,7 +155,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 
 	n.mu.Lock()
 	n.trEventLogf("starting")
-	n.started = true
+	n.serve = true
 
 	if n.accs == nil {
 		// Start called after Stop
@@ -337,14 +374,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		n.mu.Unlock()
 	}()
 
-	s.Handle(handle.NewServiceHandle(&handle.Option{
-		Codec:            n.opts.getCodec(),
-		ReqTypeValidator: func(reqType reflect.Type) error { return nil },
-		ResTypeValidator: func(reqType reflect.Type) error { return nil },
-		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
-		HookCall:         n.onCall,
-		HookNofify:       n.onNotify,
-	}))
+	s.Handle(n.srvHandle)
 }
 
 func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package scatter.node.proto;
 
-option go_package = "protobuf/node";
+option go_package = "node/grpc_proto";
 
 // 节点标识
 message NodeIdentity{

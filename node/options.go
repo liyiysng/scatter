@@ -1,10 +1,12 @@
 package node
 
 import (
+	"reflect"
 	"time"
 
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
+	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/textlog"
 
 	//json编码
@@ -71,6 +73,14 @@ type Options struct {
 	metricsConnCountEnable bool
 	// 读/写字节数
 	metricsReadWriteBytesCountEnable bool
+
+	// rpc
+	// 請求類型驗證
+	reqTypeValidator func(reqType reflect.Type) error
+	// 回复類型驗證
+	resTypeValidator func(reqType reflect.Type) error
+	// 可选参数
+	optArgs *handle.OptionalArgs
 }
 
 func (o *Options) metricsConnCountEnabled() bool {
@@ -108,10 +118,13 @@ var defaultOptions = Options{
 	connectionTimeout: 120 * time.Second,
 	readTimeout:       0,
 	writeTimeout:      time.Second * 5,
+	codec:             "proto",
 	compresser:        "gzip",
 	enableLimit:       false,
 	enableTraceDetail: true,
 	showHandleLog:     true,
+	reqTypeValidator:  func(reqType reflect.Type) error { return nil },
+	resTypeValidator:  func(reqType reflect.Type) error { return nil },
 }
 
 // IOption 设置 日志等级等....
@@ -152,5 +165,15 @@ func EnableTextLog(sink textlog.Sink) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.needTextLog = true
 		o.textLogWriter = sink
+	})
+}
+
+// WithOptArgs rpc可选参数配置
+func WithOptArgs(optArgs *handle.OptionalArgs) IOption {
+	if optArgs == nil {
+		panic("[WithOptArgs] nil param")
+	}
+	return newFuncServerOption(func(o *Options) {
+		o.optArgs = optArgs
 	})
 }
