@@ -80,7 +80,11 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 
 	// 缺省日志
 	if opts.Logger == nil {
-		opts.Logger = logger.GDepthLogger
+		if opts.LogPrefix != "" {
+			opts.Logger = logger.NewPrefixLogger(logger.GDepthLogger, opts.LogPrefix)
+		} else {
+			opts.Logger = logger.GDepthLogger
+		}
 	}
 
 	n = &Node{
@@ -233,6 +237,12 @@ func (n *Node) Stop() {
 
 	defer func() {
 		n.waitGroup.Wait()
+		if n.opts.needTextLog && n.opts.textLogWriter != nil {
+			err := n.opts.textLogWriter.Close()
+			if err != nil {
+				n.opts.Logger.Errorf("close text log failed %v", err)
+			}
+		}
 		n.opts.Logger.Infof("node %s stoped", n.opts.ID)
 	}()
 
@@ -295,17 +305,13 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		Logger:            n.opts.Logger,
 		ReqChanSize:       0,
 		ResChanSize:       0,
+		Codec:             n.opts.getCodec(),
 		GetMessageOpt:     func(msg message.Message) message.PacketOpt { return 0 },
-		ReqHandle:         nil,
-		ReqInterceptor:    nil,
 		PushInterceptor:   nil,
-		NofityHandle:      nil,
-		NotifyInterceptor: nil,
-		OnMsgFinish:       func(ctx context.Context) { n.opts.Logger.Info("message finished.") },
+		OnMsgFinish:       n.onMessageFinished,
 		MsgHandleTimeOut:  0,
 		MsgMaxLiveTime:    time.Second * 5,
-		EnableProfile:     false,
-		EnableBlobLog:     false,
+		EnableTraceDetail: n.opts.enableTraceDetail,
 		KeepAlive:         time.Minute * 5,
 		MaxMsgCacheNum:    3,
 	})
@@ -341,24 +347,52 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	}))
 }
 
-func (n *Node) onCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {
+func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {
 
 	beg := time.Now()
 
 	res, err := caller(req)
 
-	n.opts.Logger.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
+	if n.opts.showHandleLog {
+		n.opts.Logger.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
+	}
+
+	// trace
+	if n.opts.enableTraceDetail {
+		session.SetReadPayloadObj(ctx, req)
+		session.SetWritePayloadObj(ctx, res)
+	}
 
 	return err
 }
 
-func (n *Node) onNotify(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error {
+func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error {
 
 	beg := time.Now()
 
 	err := caller(req)
 
-	n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
+	if n.opts.showHandleLog {
+		n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
+	}
+
+	// trace
+	if n.opts.enableTraceDetail {
+		session.SetReadPayloadObj(ctx, req)
+	}
 
 	return err
+}
+
+func (n *Node) onMessageFinished(ctx context.Context) {
+	if n.opts.needTextLog && n.opts.textLogWriter != nil {
+		if info, ok := session.MsgInfoFromContext(ctx); ok {
+			err := n.opts.textLogWriter.Write(info)
+			if err != nil {
+				n.opts.Logger.Errorf("[Node.onMessageFinished] write text log faild %v", err)
+				n.opts.needTextLog = false
+				return
+			}
+		}
+	}
 }

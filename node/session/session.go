@@ -29,11 +29,11 @@ type Session interface {
 	// Stats 获取客户端状态
 	Stats() State
 	// 向客户端推送消息
-	Push(ctx context.Context, cmd string, data []byte) error
+	Push(ctx context.Context, cmd string, v interface{}) error
 	// 向客户端推送消息
-	PushTimeout(ctx context.Context, cmd string, data []byte, timeout time.Duration) error
+	PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration) error
 	// 向客户端推送,若发送缓冲已满则会返回 ErrorPushBufferFull
-	PushImmediately(ctx context.Context, cmd string, data []byte) error
+	PushImmediately(ctx context.Context, cmd string, v interface{}) error
 	// 关闭回调
 	OnClose(onClose OnClose)
 	// session是否关闭

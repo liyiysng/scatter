@@ -9,10 +9,17 @@ import (
 
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/message"
+	"github.com/liyiysng/scatter/node/textlog"
 )
 
 func startServer(t *testing.T) (n *Node, err error) {
-	n, err = NewNode()
+
+	sink, err := textlog.NewTempFileSink()
+	if err != nil {
+		return
+	}
+
+	n, err = NewNode(EnableTextLog(sink))
 	if err != nil {
 		return
 	}

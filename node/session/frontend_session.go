@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"runtime"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/constants"
+	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/handle"
@@ -23,16 +25,10 @@ type Option struct {
 	ResChanSize int
 	// 获取消息选项 , 如某些消息需要压缩等
 	GetMessageOpt func(msg message.Message) message.PacketOpt
-	// 请求消息处理
-	ReqHandle handle.RequestHandler
-	// 消息拦截
-	ReqInterceptor handle.SerrviceRequestInterceptor
 	// push拦截
 	PushInterceptor handle.SerrvicePushInterceptor
-	// notify处理
-	NofityHandle handle.NotifyHandler
-	// notify拦截
-	NotifyInterceptor handle.SerrviceNotifyInterceptor
+	// 编码
+	Codec encoding.Codec
 	// 当消息完成
 	OnMsgFinish func(ctx context.Context)
 	// 消息处理超时
@@ -41,10 +37,8 @@ type Option struct {
 	// 消息存活时间
 	// 0:表示一直存活
 	MsgMaxLiveTime time.Duration
-	// 是否启动profile
-	EnableProfile bool
-	// 二进制日志
-	EnableBlobLog bool
+	// 是监视详情
+	EnableTraceDetail bool
 	// keepAlive
 	KeepAlive time.Duration
 	// 消息缓存量
@@ -92,15 +86,21 @@ var msgCtxPool = sync.Pool{
 	},
 }
 
-func getMsgCtxWithContext(ctx context.Context) *msgCtx {
+func getMsgCtxWithContext(ctx context.Context, enableProfile bool) *msgCtx {
 	ret := msgCtxPool.Get().(*msgCtx)
 	ret.ctx, ret.cancel = context.WithCancel(ctx)
+	if enableProfile {
+		ret.ctx = withInfo(ret.ctx)
+	}
 	return ret
 }
 
-func getMsgCtx() *msgCtx {
+func getMsgCtx(enableProfile bool) *msgCtx {
 	ret := msgCtxPool.Get().(*msgCtx)
 	ret.ctx, ret.cancel = context.WithCancel(context.Background())
+	if enableProfile {
+		ret.ctx = withInfo(ret.ctx)
+	}
 	return ret
 }
 
@@ -171,22 +171,48 @@ func (s *frontendSession) Stats() State {
 	}
 }
 
-func (s *frontendSession) Push(ctx context.Context, cmd string, data []byte) error {
+func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}) error {
+
+	data, err := s.opt.Codec.Marshal(v)
+	if err != nil {
+		return err
+	}
+
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
 	}
-	mctx := getMsgCtxWithContext(ctx)
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
 
-	var err error
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
 		return err
+	}
+
+	if s.opt.EnableTraceDetail {
+		SetWritePayloadObj(mctx.ctx, v)
 	}
 
 	return s.push(mctx)
 }
 
 func (s *frontendSession) push(mctx *msgCtx) error {
+
+	if s.opt.PushInterceptor != nil {
+		needPush, err := s.opt.PushInterceptor(mctx.ctx, mctx.msgWrite)
+		if err != nil {
+			s.finishMsg(mctx, err)
+			return err
+		}
+		if !needPush {
+			s.finishMsg(mctx, fmt.Errorf("push message intercepted"))
+			return nil
+		}
+	}
+
+	if s.opt.EnableTraceDetail {
+		onMsgWrite(mctx.ctx, mctx.msgWrite)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.writeChanClosed {
@@ -211,14 +237,19 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 	}
 }
 
-func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, data []byte, timeout time.Duration) error {
+func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration) error {
 
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
 	}
-	mctx := getMsgCtxWithContext(ctx)
 
-	var err error
+	data, err := s.opt.Codec.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
+
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
 		return err
@@ -226,21 +257,49 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, data []by
 
 	mctx.WithTimeout(timeout)
 
+	if s.opt.EnableTraceDetail {
+		SetWritePayloadObj(mctx.ctx, v)
+	}
+
 	return s.push(mctx)
 }
 
-func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, data []byte) error {
+func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v interface{}) error {
 
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
 	}
 
-	mctx := getMsgCtxWithContext(ctx)
+	data, err := s.opt.Codec.Marshal(v)
+	if err != nil {
+		return err
+	}
 
-	var err error
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
+
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
 		return err
+	}
+
+	if s.opt.EnableTraceDetail {
+		SetWritePayloadObj(mctx.ctx, v)
+	}
+
+	if s.opt.PushInterceptor != nil {
+		needPush, err := s.opt.PushInterceptor(mctx.ctx, mctx.msgWrite)
+		if err != nil {
+			s.finishMsg(mctx, err)
+			return err
+		}
+		if !needPush {
+			s.finishMsg(mctx, fmt.Errorf("push message intercepted"))
+			return nil
+		}
+	}
+
+	if s.opt.EnableTraceDetail {
+		onMsgWrite(mctx.ctx, mctx.msgWrite)
 	}
 
 	s.mu.Lock()
@@ -371,6 +430,17 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 
 func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) error {
 
+	// profile
+	if s.opt.EnableTraceDetail {
+		onMsgBegingHandle(mctx.ctx)
+	}
+
+	defer func() {
+		if s.opt.EnableTraceDetail {
+			onMsgEndHandle(mctx.ctx)
+		}
+	}()
+
 	if mctx.ctx.Err() != nil { // 已经超时或取消
 		return handle.NewCustomErrorWithError(mctx.ctx.Err())
 	}
@@ -443,6 +513,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			if err != nil {
 				return err
 			}
+
 			err = s.sendWrite(mctx)
 			if err != nil {
 				return err
@@ -460,7 +531,11 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 				return err
 			}
 			s.handShake = h
-			//s.opt.Logger.Infof("handshake %v", s.handShake)
+
+			if s.opt.EnableTraceDetail {
+				SetReadPayloadObj(mctx.ctx, h)
+			}
+
 			// write ack
 			mctx.msgWrite, err = message.MsgFactory.BuildHandShakeAckMessage()
 			if err != nil {
@@ -480,6 +555,11 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 
 // prevent block in write chan when closing
 func (s *frontendSession) sendWrite(mctx *msgCtx) error {
+
+	if s.opt.EnableTraceDetail {
+		onMsgWrite(mctx.ctx, mctx.msgWrite)
+	}
+
 	select {
 	case <-mctx.ctx.Done():
 		{
@@ -582,7 +662,16 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 
 func (s *frontendSession) finishMsg(mctx *msgCtx, err error) {
 	mctx.cancel() // release resource
-	putMsgCtx(mctx)
+	defer putMsgCtx(mctx)
+
+	if s.opt.EnableTraceDetail {
+		onMsgFinished(mctx.ctx, err)
+	}
+
+	if s.opt.OnMsgFinish != nil {
+		s.opt.OnMsgFinish(mctx.ctx)
+	}
+
 }
 
 func (s *frontendSession) runRead() {
@@ -607,12 +696,17 @@ func (s *frontendSession) runRead() {
 			return
 		}
 
-		mctx := getMsgCtx()
+		mctx := getMsgCtx(s.opt.EnableTraceDetail)
 		mctx.msgRead = msg
 
 		// 消息存活时间
 		if s.opt.MsgMaxLiveTime != 0 {
 			mctx.WithTimeout(s.opt.MsgMaxLiveTime)
+		}
+
+		// profile
+		if s.opt.EnableTraceDetail {
+			onMsgRead(mctx.ctx, mctx.msgRead)
 		}
 
 		select {
@@ -628,12 +722,6 @@ func (s *frontendSession) runRead() {
 }
 
 func (s *frontendSession) drainWrite() {
-
-	s.opt.Logger.Info("[frontendSession.drainWrite]")
-
-	defer func() {
-		s.opt.Logger.Info("[frontendSession.drainWrite] leave")
-	}()
 
 	var err error
 

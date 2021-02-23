@@ -5,6 +5,7 @@ import (
 
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
+	"github.com/liyiysng/scatter/node/textlog"
 
 	//json编码
 	_ "github.com/liyiysng/scatter/encoding/json"
@@ -28,6 +29,14 @@ type Options struct {
 	LogPrefix string
 	// 日志实体
 	Logger logger.DepthLogger
+	// 显示处理日志
+	showHandleLog bool
+
+	// 文件日志
+	// 是否记录消息详情
+	needTextLog bool
+	// 消息详情文件路径
+	textLogWriter textlog.Sink
 
 	// 链接设置
 	// 缓冲设置
@@ -53,6 +62,8 @@ type Options struct {
 	// trace
 	// 允许事件跟踪
 	enableEventTrace bool
+	// 监视详情
+	enableTraceDetail bool
 
 	// 指标
 	metricsEnable bool
@@ -99,6 +110,8 @@ var defaultOptions = Options{
 	writeTimeout:      time.Second * 5,
 	compresser:        "gzip",
 	enableLimit:       false,
+	enableTraceDetail: true,
+	showHandleLog:     true,
 }
 
 // IOption 设置 日志等级等....
@@ -128,5 +141,16 @@ func newFuncServerOption(f func(*Options)) *funcOption {
 func WriteBufferSize(s int) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.writeBufferSize = s
+	})
+}
+
+// EnableTextLog 开启文本日志
+func EnableTextLog(sink textlog.Sink) IOption {
+	if sink == nil {
+		panic("[EnableTextLog] nil sink")
+	}
+	return newFuncServerOption(func(o *Options) {
+		o.needTextLog = true
+		o.textLogWriter = sink
 	})
 }

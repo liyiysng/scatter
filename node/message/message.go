@@ -45,8 +45,8 @@ var msgTypes = map[MsgType]string{
 	ERROR:        "ERROR",
 }
 
-func (mt *MsgType) String() string {
-	return msgTypes[*mt]
+func (mt MsgType) String() string {
+	return msgTypes[mt]
 }
 
 // MsgFactory 消息工厂
@@ -68,6 +68,8 @@ type Message interface {
 	GetSequence() int32
 	// 获取数据
 	GetPayload() []byte
+	// 字符表达
+	String() string
 }
 
 // Factor 消息工厂,更具数据构建消息

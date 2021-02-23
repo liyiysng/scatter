@@ -4,60 +4,87 @@ import (
 	"fmt"
 )
 
-// PrefixLogger does logging with a prefix.
-//
-// Logging method on a nil logs without any prefix.
-type PrefixLogger struct {
+const prefixLogDepth = 2
+
+// prefixLogger Logging method on a nil logs without any prefix.
+type prefixLogger struct {
 	logger DepthLogger
 	prefix string
 }
 
-// Infof does info logging.
-func (pl *PrefixLogger) Infof(format string, args ...interface{}) {
-	if pl != nil {
-		// Handle nil, so the tests can pass in a nil logger.
-		format = pl.prefix + format
-		pl.logger.InfoDepth(1, fmt.Sprintf(format, args...))
-		return
-	}
-	InfoDepth(1, fmt.Sprintf(format, args...))
+func (g *prefixLogger) Info(args ...interface{}) {
+	g.InfoDepth(prefixLogDepth, fmt.Sprint(args...))
 }
 
-// Warningf does warning logging.
-func (pl *PrefixLogger) Warningf(format string, args ...interface{}) {
-	if pl != nil {
-		format = pl.prefix + format
-		pl.logger.WarningDepth(1, fmt.Sprintf(format, args...))
-		return
-	}
-	WarningDepth(1, fmt.Sprintf(format, args...))
+func (g *prefixLogger) Infoln(args ...interface{}) {
+	g.InfoDepth(prefixLogDepth, fmt.Sprintln(args...))
 }
 
-// Errorf does error logging.
-func (pl *PrefixLogger) Errorf(format string, args ...interface{}) {
-	if pl != nil {
-		format = pl.prefix + format
-		pl.logger.ErrorDepth(1, fmt.Sprintf(format, args...))
-		return
-	}
-	ErrorDepth(1, fmt.Sprintf(format, args...))
+func (g *prefixLogger) Infof(format string, args ...interface{}) {
+	g.InfoDepth(prefixLogDepth, fmt.Sprintf(format, args...))
 }
 
-// Debugf does info logging at verbose level 2.
-func (pl *PrefixLogger) Debugf(format string, args ...interface{}) {
-	if !GLogger.V(2) {
-		return
-	}
-	if pl != nil {
-		// Handle nil, so the tests can pass in a nil logger.
-		format = pl.prefix + format
-		pl.logger.InfoDepth(1, fmt.Sprintf(format, args...))
-		return
-	}
-	InfoDepth(1, fmt.Sprintf(format, args...))
+func (g *prefixLogger) Warning(args ...interface{}) {
+	g.WarningDepth(prefixLogDepth, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) Warningln(args ...interface{}) {
+	g.WarningDepth(prefixLogDepth, fmt.Sprintln(args...))
+}
+
+func (g *prefixLogger) Warningf(format string, args ...interface{}) {
+	g.WarningDepth(prefixLogDepth, fmt.Sprintf(format, args...))
+}
+
+func (g *prefixLogger) Error(args ...interface{}) {
+	g.ErrorDepth(prefixLogDepth, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) Errorln(args ...interface{}) {
+	g.ErrorDepth(prefixLogDepth, fmt.Sprintln(args...))
+}
+
+func (g *prefixLogger) Errorf(format string, args ...interface{}) {
+	g.ErrorDepth(prefixLogDepth, fmt.Sprintf(format, args...))
+}
+
+func (g *prefixLogger) Fatal(args ...interface{}) {
+	g.FatalDepth(prefixLogDepth, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) Fatalln(args ...interface{}) {
+	g.FatalDepth(prefixLogDepth, fmt.Sprintln(args...))
+}
+
+func (g *prefixLogger) Fatalf(format string, args ...interface{}) {
+	g.FatalDepth(prefixLogDepth, fmt.Sprintf(format, args...))
+}
+
+func (g *prefixLogger) InfoDepth(depth int, args ...interface{}) {
+	args = append(args, g.prefix)
+	g.logger.InfoDepth(depth+1, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) WarningDepth(depth int, args ...interface{}) {
+	args = append(args, g.prefix)
+	g.logger.WarningDepth(depth+1, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) ErrorDepth(depth int, args ...interface{}) {
+	args = append(args, g.prefix)
+	g.logger.ErrorDepth(depth+1, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) FatalDepth(depth int, args ...interface{}) {
+	args = append(args, g.prefix)
+	g.logger.Fatal(depth+1, fmt.Sprint(args...))
+}
+
+func (g *prefixLogger) V(l int) bool {
+	return g.logger.V(l)
 }
 
 // NewPrefixLogger creates a prefix logger with the given prefix.
-func NewPrefixLogger(logger DepthLogger, prefix string) *PrefixLogger {
-	return &PrefixLogger{logger: logger, prefix: prefix}
+func NewPrefixLogger(logger DepthLogger, prefix string) DepthLogger {
+	return &prefixLogger{logger: logger, prefix: prefix}
 }
