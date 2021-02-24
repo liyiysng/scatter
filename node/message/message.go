@@ -4,6 +4,12 @@ package message
 import (
 	"errors"
 	"strings"
+
+	"github.com/liyiysng/scatter/logger"
+)
+
+var (
+	myLog = logger.Component("message")
 )
 
 // MsgType 消息类型
@@ -85,9 +91,9 @@ type Factor interface {
 	// BuildHandShakeAckMessage 创建一个握手回复 Message
 	BuildHandShakeAckMessage() (msg Message, err error)
 	// BuildResponseMessage 创建一个回复
-	BuildResponseMessage(sequence int32, payload []byte) (msg Message, err error)
+	BuildResponseMessage(sequence int32, srv string, payload []byte) (msg Message, err error)
 	//BuildResponseCustomErrorMessage 创建一个自定义错误回复
-	BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message, err error)
+	BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error)
 
 	// ParseHandShake 解析握手数据
 	ParseHandShake(buf []byte) (h interface{}, err error)

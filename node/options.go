@@ -8,12 +8,17 @@ import (
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/handle"
+	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/node/textlog"
 
 	//json编码
 	_ "github.com/liyiysng/scatter/encoding/json"
 	//proto编码
 	_ "github.com/liyiysng/scatter/encoding/proto"
+	//gzip压缩
+	_ "github.com/liyiysng/scatter/encoding/gzip"
+	//snappy压缩
+	_ "github.com/liyiysng/scatter/encoding/snappy"
 )
 
 const (
@@ -69,6 +74,10 @@ type Options struct {
 	// 写chan缓冲
 	writeChanBufSize int
 
+	// 消息设置
+	// 消息选项 , 是否压缩等(当写消息时使用)
+	messageOpt message.PacketOptGetter
+
 	// trace
 	// 允许事件跟踪
 	enableEventTrace bool
@@ -95,6 +104,11 @@ func (o *Options) validate() error {
 	if o.needTextLog && !o.enableTraceDetail {
 		return fmt.Errorf("want text log , but trace detail was disabled")
 	}
+
+	if c := encoding.GetCompressor(o.compresser); c == nil {
+		return fmt.Errorf("cmpressor %q not support", o.compresser)
+	}
+
 	return nil
 }
 
@@ -116,7 +130,7 @@ func (o *Options) getCompressor() encoding.Compressor {
 	if o.compresser != "" {
 		return encoding.GetCompressor(o.compresser)
 	}
-	return nil
+	return encoding.GetCompressor("gzip")
 }
 
 func (o *Options) getCodec() encoding.Codec {
@@ -140,6 +154,7 @@ var defaultOptions = Options{
 	showHandleLog:     true,
 	reqTypeValidator:  func(reqType reflect.Type) error { return nil },
 	resTypeValidator:  func(reqType reflect.Type) error { return nil },
+	messageOpt:        message.DefalutPacketOptGetter,
 	readChanBufSize:   1024,
 	writeChanBufSize:  1024,
 }
@@ -206,5 +221,23 @@ func NOptShowHandleLog(show bool) IOption {
 func NOptTraceDetail(trace bool) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.enableTraceDetail = trace
+	})
+}
+
+// NOptMessageOpt 消息选项
+func NOptMessageOpt(op message.PacketOptGetter) IOption {
+	if op == nil {
+		panic("nil message opt")
+	}
+
+	return newFuncServerOption(func(o *Options) {
+		o.messageOpt = op
+	})
+}
+
+// NOptCompress 压缩算法
+func NOptCompress(c string) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.compresser = c
 	})
 }

@@ -430,7 +430,8 @@ func BenchmarkRPCSingleClient(b *testing.B) {
 }
 
 type ncall struct {
-	res interface{}
+	res  interface{}
+	done chan struct{}
 }
 
 type nodeClient struct {
@@ -479,6 +480,9 @@ func (c *nodeClient) readOne() error {
 	if call, ok := c.pendingCall[recvMsg.GetSequence()]; ok {
 		res = call.res
 		delete(c.pendingCall, recvMsg.GetSequence())
+		if call.done != nil {
+			close(call.done)
+		}
 		c.wg.Done()
 	} else {
 		c.mu.Unlock()
@@ -494,18 +498,20 @@ func (c *nodeClient) readOne() error {
 	return nil
 }
 
-func (c *nodeClient) call(srv string, req interface{}, res interface{}) error {
+func (c *nodeClient) call(srv string, req interface{}, res interface{}, popgetter message.PacketOptGetter) (done <-chan struct{}, err error) {
+
+	callDone := make(chan struct{})
 
 	sequence := atomic.AddInt32(&c.seq, 1)
 
 	buf, err := c.codec.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	msg, err := message.MsgFactory.BuildRequestMessage(sequence, srv, buf)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	c.mu.Lock()
@@ -514,9 +520,9 @@ func (c *nodeClient) call(srv string, req interface{}, res interface{}) error {
 	}
 
 	c.pendingCall[sequence] = &ncall{
-		res: res,
+		res:  res,
+		done: callDone,
 	}
-	c.wg.Add(1)
 	c.mu.Unlock()
 
 	defer func() {
@@ -528,19 +534,29 @@ func (c *nodeClient) call(srv string, req interface{}, res interface{}) error {
 		}
 	}()
 
-	c.wl.Lock()
-	err = c.c.WriteNextMessage(msg, 0)
+	err = c.wirteOne(msg, popgetter(msg))
 	if err != nil {
-		c.wl.Unlock()
+		return nil, err
+	}
+
+	return callDone, nil
+}
+
+func (c *nodeClient) wirteOne(msg message.Message, popt message.PacketOpt) error {
+	c.wl.Lock()
+	defer c.wl.Unlock()
+
+	err := c.c.WriteNextMessage(msg, popt)
+	if err != nil {
 		return err
 	}
 
 	err = c.c.Flush()
 	if err != nil {
-		c.wl.Unlock()
 		return err
 	}
-	c.wl.Unlock()
+
+	c.wg.Add(1)
 
 	return nil
 }
@@ -601,13 +617,14 @@ func BenchmarkRPC(b *testing.B) {
 
 			cl := clients[int(cur)%clientCount]
 
-			err = cl.call(
+			_, err = cl.call(
 				"ServiceTest.Sum",
 				&node_testing.SumReq{
 					LOP: 10,
 					ROP: 10,
 				},
 				res,
+				message.DefalutPacketOptGetter,
 			)
 			if err != nil {
 				b.Fatal(err)
@@ -696,5 +713,116 @@ func BenchmarkGRPC(b *testing.B) {
 	})
 
 	wwg.Wait()
+
+}
+
+// 消息选项测试
+func TestNodeMsgOpt(t *testing.T) {
+
+	sopt := func(msg message.Message) message.PacketOpt {
+		if msg.GetService() == "ServiceTest.Sum" {
+			return message.COMPRESS
+		}
+		return 0
+	}
+
+	n, err := NewNode(NOptShowHandleLog(false), NOptTraceDetail(false), NOptMessageOpt(sopt), NOptCompress("gzip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer n.Stop()
+
+	n.Register(&ServiceTest{})
+
+	srvNode(n)
+
+	// 确保node启动
+	time.Sleep(time.Second)
+
+	// 创建客户端
+	conn, err := createClient(n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &nodeClient{
+		codec:      n.opts.getCodec(),
+		c:          conn,
+		closeEvent: util.NewEvent(),
+	}
+	defer client.close()
+	go client.runRead()
+
+	res := &node_testing.SumRes{}
+
+	done, err := client.call(
+		"ServiceTest.Sum",
+		&node_testing.SumReq{
+			LOP: 10,
+			ROP: 10,
+			DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
+			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
+		},
+		res,
+		sopt,
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-done
+
+	t.Log(res)
 
 }

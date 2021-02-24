@@ -27,7 +27,7 @@ type Option struct {
 	ReadChanSize  int
 	WriteChanSize int
 	// 获取消息选项 , 如某些消息需要压缩等
-	GetMessageOpt func(msg message.Message) message.PacketOpt
+	GetMessageOpt message.PacketOptGetter
 	// push拦截
 	PushInterceptor handle.SerrvicePushInterceptor
 	// 编码
@@ -469,13 +469,14 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 	case message.REQUEST:
 		{
 			sequence := mctx.msgRead.GetSequence()
+			srv := mctx.msgRead.GetService()
 			resBuf, err := s.handleRequest(mctx, srvHandler)
 
 			if err != nil {
 				if customErr, ok := err.(handle.ICustomError); ok {
 					// 非关键错误
 					// 回复客户端
-					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(sequence, customErr.Error())
+					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(sequence, srv, customErr.Error())
 					if err != nil {
 						return err
 					}
@@ -488,7 +489,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			}
 
 			// 回复客户端
-			mctx.msgWrite, err = message.MsgFactory.BuildResponseMessage(sequence, resBuf)
+			mctx.msgWrite, err = message.MsgFactory.BuildResponseMessage(sequence, srv, resBuf)
 			if err != nil {
 				return err
 			}

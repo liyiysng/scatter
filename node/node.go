@@ -16,7 +16,6 @@ import (
 	"github.com/liyiysng/scatter/node/acceptor"
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/handle"
-	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/util"
 	"golang.org/x/net/trace"
@@ -348,7 +347,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		ReadChanSize:      n.opts.readChanBufSize,
 		WriteChanSize:     n.opts.writeChanBufSize,
 		Codec:             n.opts.getCodec(),
-		GetMessageOpt:     func(msg message.Message) message.PacketOpt { return 0 },
+		GetMessageOpt:     n.opts.messageOpt,
 		PushInterceptor:   nil,
 		OnMsgFinish:       n.onMessageFinished,
 		MsgHandleTimeOut:  0,

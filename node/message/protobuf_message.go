@@ -22,6 +22,14 @@ func (m *ProtobufMsg) FromBytes(b []byte) error {
 
 // ToBytes 实现Message接口
 func (m *ProtobufMsg) ToBytes() (b []byte, err error) {
+	//若时回复消息,service字段无需序列化
+	if m.GetMsgType() == RESPONSE {
+		srv := m.Head.Service
+		m.Head.Service = ""
+		b, err = proto.Marshal(&m.Head)
+		m.Head.Service = srv
+		return
+	}
 	return proto.Marshal(&m.Head)
 }
 
@@ -36,13 +44,14 @@ func (f *protoBufFactory) BuildMessage(buf []byte) (msg Message, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return
 }
 
 // BuildPushMessage 创建一个push Message
 func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType: int32(PUSH),
 			Service: cmd,
 			Payload: data,
@@ -54,7 +63,7 @@ func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message
 // BuildHeatAckMessage 创建一个心跳回复 Message
 func (f *protoBufFactory) BuildHeatAckMessage() (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType: int32(HEARTBEATACK),
 		},
 	}
@@ -76,7 +85,7 @@ func (f *protoBufFactory) BuildHandShakeMessage(platform, clientVersion, buildVe
 	}
 
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType: int32(HANDSHAKE),
 			Payload: buf,
 		},
@@ -87,7 +96,7 @@ func (f *protoBufFactory) BuildHandShakeMessage(platform, clientVersion, buildVe
 // BuildHandShakeAckMessage 创建一个握手回复 Message
 func (f *protoBufFactory) BuildHandShakeAckMessage() (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType: int32(HANDSHAKEACK),
 		},
 	}
@@ -95,10 +104,11 @@ func (f *protoBufFactory) BuildHandShakeAckMessage() (msg Message, err error) {
 }
 
 // BuildResponseMessage 创建一个回复
-func (f *protoBufFactory) BuildResponseMessage(sequence int32, payload []byte) (msg Message, err error) {
+func (f *protoBufFactory) BuildResponseMessage(sequence int32, srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType:  int32(RESPONSE),
+			Service:  srv,
 			Sequence: sequence,
 			Payload:  payload,
 		},
@@ -107,10 +117,11 @@ func (f *protoBufFactory) BuildResponseMessage(sequence int32, payload []byte) (
 }
 
 //BuildResponseCustomErrorMessage 创建一个自定义错误回复
-func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, customError string) (msg Message, err error) {
+func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType:     int32(RESPONSE),
+			Service:     srv,
 			Sequence:    sequence,
 			CustomError: customError,
 		},
@@ -132,7 +143,7 @@ func (f *protoBufFactory) ParseHandShake(buf []byte) (h interface{}, err error) 
 // BuildRequestMessage 创建一个请求
 func (f *protoBufFactory) BuildRequestMessage(sequence int32, srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType:  int32(REQUEST),
 			Service:  srv,
 			Sequence: sequence,
@@ -145,7 +156,7 @@ func (f *protoBufFactory) BuildRequestMessage(sequence int32, srv string, payloa
 // BuildNotifyMessage 创建一个通知
 func (f *protoBufFactory) BuildNotifyMessage(srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
-		phead.Head{
+		Head: phead.Head{
 			MsgType: int32(NOTIFY),
 			Service: srv,
 			Payload: payload,

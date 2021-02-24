@@ -55,6 +55,14 @@ type Packet struct {
 	Data      []byte
 }
 
+// PacketOptGetter 获取包选项
+type PacketOptGetter func(msg Message) PacketOpt
+
+// DefalutPacketOptGetter 缺省选项
+var DefalutPacketOptGetter PacketOptGetter = func(msg Message) PacketOpt {
+	return 0
+}
+
 // ReadFrom 从reader中读取package
 func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLength int) (n int, err error) {
 
@@ -87,6 +95,7 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 			return n, err
 		}
 		if p.PacketOpt&COMPRESS > 0 { // 解压
+
 			r, err := compressor.Decompress(bytes.NewBuffer(buf))
 			if err != nil {
 				return n, err
@@ -114,13 +123,19 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 	bufToWrite := p.Data
 
 	if length > 0 && p.PacketOpt&COMPRESS > 0 { // 压缩
+
 		compressBuf := util.BufferPoolGet()
 		defer util.BufferPoolPut(compressBuf)
+
 		wr, err := compresser.Compress(compressBuf)
 		if err != nil {
 			return 0, err
 		}
 		_, err = wr.Write(p.Data)
+		if err != nil {
+			return 0, err
+		}
+		err = wr.Close()
 		if err != nil {
 			return 0, err
 		}

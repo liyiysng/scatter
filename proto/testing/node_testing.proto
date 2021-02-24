@@ -5,6 +5,7 @@ option go_package = "node/node_testing";
 message SumReq{
     int64 LOP = 1;
     int64 ROP = 2;
+    string DataStr = 3;
 }
 
 message SumRes{
