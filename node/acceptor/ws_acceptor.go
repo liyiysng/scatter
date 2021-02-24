@@ -67,9 +67,11 @@ func (w *WSAcceptor) ListenAndServe() error {
 // Stop stops the acceptor
 func (w *WSAcceptor) Stop() {
 	w.closeOnce.Do(func() {
-		err := w.listener.Close()
-		if err != nil {
-			w.opt.Logger.Errorf("Failed to stop: %s", err.Error())
+		if w.listener != nil {
+			err := w.listener.Close()
+			if err != nil {
+				w.opt.Logger.Errorf("Failed to stop: %s", err.Error())
+			}
 		}
 		w.closed = true
 		w.opt.Logger.Info("stop ws listen: %s", w.opt.Addr)

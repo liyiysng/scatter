@@ -17,7 +17,7 @@ func NewTempFileSink() (Sink, error) {
 	// Two other options to replace this function:
 	// 1. take filename as input.
 	// 2. export NewBufferedSink().
-	tempFile, err := ioutil.TempFile("./tmp", "scatter_textlog_*.txt")
+	tempFile, err := ioutil.TempFile("./tmp", "scatter_textlog_*.log")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %v", err)
 	}

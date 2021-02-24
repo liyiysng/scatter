@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -47,9 +48,12 @@ type Options struct {
 	// 数据最大长度
 	maxPayloadLength int
 	// 超时设置
+	// 链接超时(当链接创建后多久事件未接受到handshake消息)
+	// 次值不能为0
 	connectionTimeout time.Duration
-	readTimeout       time.Duration
-	writeTimeout      time.Duration
+	// 读写超时
+	readTimeout  time.Duration
+	writeTimeout time.Duration
 	// 压缩
 	compresser string
 	// 编码
@@ -60,6 +64,10 @@ type Options struct {
 	rateLimitReadBytes int64
 	// 写限流
 	rateLimitWriteBytes int64
+	// 读chan缓冲
+	readChanBufSize int
+	// 写chan缓冲
+	writeChanBufSize int
 
 	// trace
 	// 允许事件跟踪
@@ -81,6 +89,13 @@ type Options struct {
 	resTypeValidator func(reqType reflect.Type) error
 	// 可选参数
 	optArgs *handle.OptionalArgs
+}
+
+func (o *Options) validate() error {
+	if o.needTextLog && !o.enableTraceDetail {
+		return fmt.Errorf("want text log , but trace detail was disabled")
+	}
+	return nil
 }
 
 func (o *Options) metricsConnCountEnabled() bool {
@@ -125,6 +140,8 @@ var defaultOptions = Options{
 	showHandleLog:     true,
 	reqTypeValidator:  func(reqType reflect.Type) error { return nil },
 	resTypeValidator:  func(reqType reflect.Type) error { return nil },
+	readChanBufSize:   1024,
+	writeChanBufSize:  1024,
 }
 
 // IOption 设置 日志等级等....
@@ -148,17 +165,17 @@ func newFuncServerOption(f func(*Options)) *funcOption {
 	}
 }
 
-// WriteBufferSize determines how much data can be batched before doing a write on the wire.
+// NOptWriteBufferSize determines how much data can be batched before doing a write on the wire.
 // The corresponding memory allocation for this buffer will be twice the size to keep syscalls low.
 // The default value for this buffer is 32KB.
-func WriteBufferSize(s int) IOption {
+func NOptWriteBufferSize(s int) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.writeBufferSize = s
 	})
 }
 
-// EnableTextLog 开启文本日志
-func EnableTextLog(sink textlog.Sink) IOption {
+// NOptEnableTextLog 开启文本日志
+func NOptEnableTextLog(sink textlog.Sink) IOption {
 	if sink == nil {
 		panic("[EnableTextLog] nil sink")
 	}
@@ -168,12 +185,26 @@ func EnableTextLog(sink textlog.Sink) IOption {
 	})
 }
 
-// WithOptArgs rpc可选参数配置
-func WithOptArgs(optArgs *handle.OptionalArgs) IOption {
+// NOptWithOptArgs rpc可选参数配置
+func NOptWithOptArgs(optArgs *handle.OptionalArgs) IOption {
 	if optArgs == nil {
 		panic("[WithOptArgs] nil param")
 	}
 	return newFuncServerOption(func(o *Options) {
 		o.optArgs = optArgs
+	})
+}
+
+// NOptShowHandleLog 是否显示处理日志
+func NOptShowHandleLog(show bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.showHandleLog = show
+	})
+}
+
+// NOptTraceDetail 是否监视细节
+func NOptTraceDetail(trace bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.enableTraceDetail = trace
 	})
 }

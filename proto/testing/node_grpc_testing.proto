@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "node/node_testing";
+
+
+message GRPCSumReq{
+    int64 LOP = 1;
+    int64 ROP = 2;
+}
+
+message GRPCSumRes{
+    int64 Sum = 1;
+}
+
+service GrpcSrvTest{
+    rpc GetSum (GRPCSumReq) returns (GRPCSumRes);
+}

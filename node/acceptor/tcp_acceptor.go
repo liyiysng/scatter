@@ -2,7 +2,6 @@ package acceptor
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -49,7 +48,9 @@ func (a *TCPAcceptor) Stop() {
 	a.closeOnce.Do(
 		func() {
 			a.quit.Fire()
-			a.listener.Close()
+			if a.listener != nil {
+				a.listener.Close()
+			}
 			a.opt.Logger.Infof("stop listen: %s", a.opt.Addr)
 		},
 	)
@@ -61,42 +62,42 @@ func (a *TCPAcceptor) hasTLSCertificates() bool {
 
 // ListenAndServe using tcp acceptor
 func (a *TCPAcceptor) ListenAndServe() error {
-	if a.hasTLSCertificates() {
-		return a.ListenAndServeTLS(a.opt.CertFile, a.opt.KeyFile)
-	}
-
-	listener, err := net.Listen("tcp", a.opt.Addr)
-	if err != nil {
-		return fmt.Errorf("[TCPAcceptor.ListenAndServe] Failed to listen: %s", err.Error())
-	}
-	a.listener = listener
-	a.opt.Logger.Infof("tcp listen: %s", a.opt.Addr)
-
-	a.serve()
-	return nil
+	return a.serve()
 }
 
 // ListenAndServeTLS listens using tls
 func (a *TCPAcceptor) ListenAndServeTLS(cert, key string) error {
-	crt, err := tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		return fmt.Errorf("[TCPAcceptor.ListenAndServeTLS] Failed to listen: %s", err.Error())
-	}
-
-	tlsCfg := &tls.Config{Certificates: []tls.Certificate{crt}}
-
-	listener, err := tls.Listen("tcp", a.opt.Addr, tlsCfg)
-	a.listener = listener
-
-	a.opt.Logger.Infof("tcp tls listen: %s", a.opt.Addr)
-
-	a.serve()
-	return nil
+	a.opt.CertFile = cert
+	a.opt.KeyFile = key
+	return a.serve()
 }
 
-func (a *TCPAcceptor) serve() {
+func (a *TCPAcceptor) serve() error {
 	defer a.Stop()
 	defer close(a.connChan)
+
+	if a.hasTLSCertificates() {
+		crt, err := tls.LoadX509KeyPair(a.opt.CertFile, a.opt.KeyFile)
+		if err != nil {
+			return err
+		}
+
+		tlsCfg := &tls.Config{Certificates: []tls.Certificate{crt}}
+
+		listener, err := tls.Listen("tcp", a.opt.Addr, tlsCfg)
+		if err != nil {
+			return err
+		}
+		a.listener = listener
+	} else {
+		listener, err := net.Listen("tcp", a.opt.Addr)
+		if err != nil {
+			return err
+		}
+		a.listener = listener
+	}
+
+	a.opt.Logger.Infof("tcp listen: %s", a.opt.Addr)
 
 	var tempDelay time.Duration // how long to sleep on accept failure
 
@@ -120,20 +121,19 @@ func (a *TCPAcceptor) serve() {
 				case <-timer.C:
 				case <-a.quit.Done():
 					timer.Stop()
-					return
+					return nil
 				}
 				continue
 			}
 			// 不是临时错误/尝试失败
 			if a.quit.HasFired() {
-				return
+				return nil
 			}
-			a.opt.Logger.Errorf("done; Accept = %v", err)
-			return
+			return err
 		}
 
 		if a.quit.HasFired() {
-			return
+			return nil
 		}
 		a.connChan <- conn.NewTCPMsgConn(c, a.opt.GetConnOpt())
 	}

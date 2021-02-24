@@ -3,16 +3,16 @@ package node
 import (
 	"context"
 
-	"github.com/liyiysng/scatter/protobuf/node"
+	"github.com/liyiysng/scatter/node/grpc_proto"
 )
 
 // ServiceImp 实现
 type ServiceImp struct {
-	node.UnimplementedNodeServer
+	grpc_proto.UnimplementedNodeServer
 	str string
 }
 
 // GetNodeState 获取节点状态
-func (imp *ServiceImp) GetNodeState(context.Context, *node.NodeIdentity) (*node.NodeState, error) {
+func (imp *ServiceImp) GetNodeState(context.Context, *grpc_proto.NodeIdentity) (*grpc_proto.NodeState, error) {
 	return nil, nil
 }

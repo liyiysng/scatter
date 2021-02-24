@@ -128,3 +128,28 @@ func (f *protoBufFactory) ParseHandShake(buf []byte) (h interface{}, err error) 
 	h = handshake
 	return
 }
+
+// BuildRequestMessage 创建一个请求
+func (f *protoBufFactory) BuildRequestMessage(sequence int32, srv string, payload []byte) (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType:  int32(REQUEST),
+			Service:  srv,
+			Sequence: sequence,
+			Payload:  payload,
+		},
+	}
+	return
+}
+
+// BuildNotifyMessage 创建一个通知
+func (f *protoBufFactory) BuildNotifyMessage(srv string, payload []byte) (msg Message, err error) {
+	msg = &ProtobufMsg{
+		phead.Head{
+			MsgType: int32(NOTIFY),
+			Service: srv,
+			Payload: payload,
+		},
+	}
+	return
+}

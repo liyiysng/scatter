@@ -78,6 +78,10 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 		o.apply(&opts)
 	}
 
+	if err = opts.validate(); err != nil {
+		return nil, err
+	}
+
 	// 缺省日志
 	if opts.Logger == nil {
 		if opts.LogPrefix != "" {
@@ -340,8 +344,9 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	// 创建session
 	s := session.NewFrontendSession(n.opts.ID, conn, &session.Option{
 		Logger:            n.opts.Logger,
-		ReqChanSize:       0,
-		ResChanSize:       0,
+		ConnectTimeout:    n.opts.connectionTimeout,
+		ReadChanSize:      n.opts.readChanBufSize,
+		WriteChanSize:     n.opts.writeChanBufSize,
 		Codec:             n.opts.getCodec(),
 		GetMessageOpt:     func(msg message.Message) message.PacketOpt { return 0 },
 		PushInterceptor:   nil,
@@ -384,7 +389,7 @@ func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvNa
 	res, err := caller(req)
 
 	if n.opts.showHandleLog {
-		n.opts.Logger.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
+		n.opts.Logger.Infof("%s.%s(req:{%v}) (res:{%v},err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
 	}
 
 	// trace

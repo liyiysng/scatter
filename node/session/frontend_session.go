@@ -20,9 +20,12 @@ import (
 
 // Option session选项
 type Option struct {
-	Logger      logger.Logger
-	ReqChanSize int
-	ResChanSize int
+	Logger logger.Logger
+	// 链接超时(当链接创建后多久事件未接受到handshake消息)
+	ConnectTimeout time.Duration
+	//读写Chan缓冲大小
+	ReadChanSize  int
+	WriteChanSize int
 	// 获取消息选项 , 如某些消息需要压缩等
 	GetMessageOpt func(msg message.Message) message.PacketOpt
 	// push拦截
@@ -148,8 +151,8 @@ func NewFrontendSession(nid string, c conn.MsgConn, opt *Option) FrontendSession
 		nid:        nid,
 		conn:       c,
 		opt:        opt,
-		readChan:   make(chan *msgCtx, opt.ReqChanSize),
-		writeChan:  make(chan *msgCtx, opt.ResChanSize),
+		readChan:   make(chan *msgCtx, opt.ReadChanSize),
+		writeChan:  make(chan *msgCtx, opt.WriteChanSize),
 		closeEvent: util.NewEvent(),
 	}
 
@@ -346,6 +349,9 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 	tick := time.NewTicker(s.opt.KeepAlive)
 	defer tick.Stop()
 
+	checkConnectTimeout := time.NewTimer(s.opt.ConnectTimeout)
+	defer checkConnectTimeout.Stop()
+
 	defer func() {
 
 		s.Close()
@@ -399,6 +405,11 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 					return
 				}
 
+				// 若收到握手数据
+				if mctx.msgRead.GetMsgType() == message.HANDSHAKE {
+					checkConnectTimeout.Stop()
+				}
+
 				// 处理消息
 				err := s.handleMsg(mctx, srvHandler)
 				if err != nil {
@@ -423,23 +434,19 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 
 				}
 			}
+		case <-checkConnectTimeout.C:
+			{
+				if s.handShake == nil {
+					s.opt.Logger.Warningf("connect timeout , handshake not recved in %v", s.opt.ConnectTimeout)
+					return
+				}
+			}
 		}
 	}
 
 }
 
 func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) error {
-
-	// profile
-	if s.opt.EnableTraceDetail {
-		onMsgBegingHandle(mctx.ctx)
-	}
-
-	defer func() {
-		if s.opt.EnableTraceDetail {
-			onMsgEndHandle(mctx.ctx)
-		}
-	}()
 
 	if mctx.ctx.Err() != nil { // 已经超时或取消
 		return handle.NewCustomErrorWithError(mctx.ctx.Err())
@@ -453,15 +460,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 	switch mctx.msgRead.GetMsgType() {
 	case message.NOTIFY:
 		{
-			reqMsg := mctx.msgRead
-
-			serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
-			if err != nil {
-				return handle.NewCriticalErrorWithError(err)
-			}
-
-			err = srvHandler.Notify(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
-
+			err := s.handleNotify(mctx, srvHandler)
 			if err != nil {
 				return err
 			}
@@ -469,20 +468,14 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		}
 	case message.REQUEST:
 		{
-			reqMsg := mctx.msgRead
-
-			serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
-			if err != nil {
-				return handle.NewCriticalErrorWithError(err)
-			}
-
-			resBuf, err := srvHandler.Call(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
+			sequence := mctx.msgRead.GetSequence()
+			resBuf, err := s.handleRequest(mctx, srvHandler)
 
 			if err != nil {
 				if customErr, ok := err.(handle.ICustomError); ok {
 					// 非关键错误
 					// 回复客户端
-					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(reqMsg.GetSequence(), customErr.Error())
+					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(sequence, customErr.Error())
 					if err != nil {
 						return err
 					}
@@ -495,7 +488,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			}
 
 			// 回复客户端
-			mctx.msgWrite, err = message.MsgFactory.BuildResponseMessage(reqMsg.GetSequence(), resBuf)
+			mctx.msgWrite, err = message.MsgFactory.BuildResponseMessage(sequence, resBuf)
 			if err != nil {
 				return err
 			}
@@ -506,9 +499,12 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		}
 	case message.HEARTBEAT:
 		{
-			s.lastHeartBeat = time.Now()
+			err := s.handleHeartbeat(mctx)
+			if err != nil {
+				return err
+			}
+
 			// write ack
-			var err error
 			mctx.msgWrite, err = message.MsgFactory.BuildHeatAckMessage()
 			if err != nil {
 				return err
@@ -521,19 +517,9 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		}
 	case message.HANDSHAKE:
 		{
-			if s.handShake != nil {
-				return handle.NewCriticalError("dupulicate handshake")
-			}
-
-			handShake := mctx.msgRead
-			h, err := message.MsgFactory.ParseHandShake(handShake.GetPayload())
+			err := s.handleHandshake(mctx)
 			if err != nil {
 				return err
-			}
-			s.handShake = h
-
-			if s.opt.EnableTraceDetail {
-				SetReadPayloadObj(mctx.ctx, h)
 			}
 
 			// write ack
@@ -548,6 +534,89 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		}
 	default:
 		return handle.NewCriticalErrorf("invalid message type %v", mctx.msgRead)
+	}
+
+	return nil
+}
+
+func (s *frontendSession) handleRequest(mctx *msgCtx, srvHandler handle.IHandler) (resBuf []byte, err error) {
+	// profile
+	if s.opt.EnableTraceDetail {
+		onMsgBegingHandle(mctx.ctx)
+	}
+	if s.opt.EnableTraceDetail {
+		defer onMsgEndHandle(mctx.ctx)
+	}
+
+	reqMsg := mctx.msgRead
+	serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
+	if err != nil {
+		return nil, handle.NewCriticalErrorWithError(err)
+	}
+	resBuf, err = srvHandler.Call(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
+	return
+}
+
+func (s *frontendSession) handleNotify(mctx *msgCtx, srvHandler handle.IHandler) error {
+	// profile
+	if s.opt.EnableTraceDetail {
+		onMsgBegingHandle(mctx.ctx)
+	}
+	if s.opt.EnableTraceDetail {
+		defer onMsgEndHandle(mctx.ctx)
+	}
+
+	reqMsg := mctx.msgRead
+
+	serviceName, methodName, err := message.GetSrvMethod(reqMsg.GetService())
+	if err != nil {
+		return handle.NewCriticalErrorWithError(err)
+	}
+
+	err = srvHandler.Notify(mctx.ctx, s, serviceName, methodName, reqMsg.GetPayload())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *frontendSession) handleHeartbeat(mctx *msgCtx) error {
+	// profile
+	if s.opt.EnableTraceDetail {
+		onMsgBegingHandle(mctx.ctx)
+	}
+	if s.opt.EnableTraceDetail {
+		defer onMsgEndHandle(mctx.ctx)
+	}
+
+	s.lastHeartBeat = time.Now()
+
+	return nil
+}
+
+func (s *frontendSession) handleHandshake(mctx *msgCtx) error {
+	// profile
+	if s.opt.EnableTraceDetail {
+		onMsgBegingHandle(mctx.ctx)
+	}
+	if s.opt.EnableTraceDetail {
+		defer onMsgEndHandle(mctx.ctx)
+	}
+
+	if s.handShake != nil {
+		return handle.NewCriticalError("dupulicate handshake")
+	}
+
+	handShake := mctx.msgRead
+	h, err := message.MsgFactory.ParseHandShake(handShake.GetPayload())
+	if err != nil {
+		return err
+	}
+	s.handShake = h
+
+	if s.opt.EnableTraceDetail {
+		SetReadPayloadObj(mctx.ctx, h)
 	}
 
 	return nil
@@ -580,7 +649,7 @@ func (s *frontendSession) runWrite() {
 	defer func() {
 		s.Close()
 		// 关闭链接
-		s.closeConn()
+		s.closeConn("sever close")
 	}()
 
 	cacheMsgNum := 0
@@ -606,7 +675,7 @@ func (s *frontendSession) runWrite() {
 				if err != nil {
 					s.opt.Logger.Errorf("write message error %v", err)
 					// io错误 关闭链接
-					s.closeConn()
+					s.closeConn(fmt.Sprintf("write io error:%v", err))
 					return
 				}
 				cacheMsgNum++
@@ -615,7 +684,7 @@ func (s *frontendSession) runWrite() {
 					if err = s.flush(); err != nil {
 						s.opt.Logger.Errorf("flush message error %v", err)
 						// io错误 关闭链接
-						s.closeConn()
+						s.closeConn(fmt.Sprintf("write io error:%v", err))
 						return
 					}
 					cacheMsgNum = 0
@@ -648,15 +717,14 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 	if !s.connClosed {
 		err = s.conn.WriteNextMessage(mctx.msgWrite, s.opt.GetMessageOpt(mctx.msgWrite))
 	} else {
-		err = constants.ErrSessionClosed
+		err = fmt.Errorf("%v message:{%v}", constants.ErrSessionClosed, mctx.msgWrite)
 	}
 	s.connMu.Unlock()
 
+	s.finishMsg(mctx, nil)
 	if err != nil {
-		s.finishMsg(mctx, err)
 		return err
 	}
-	s.finishMsg(mctx, nil)
 	return nil
 }
 
@@ -692,7 +760,7 @@ func (s *frontendSession) runRead() {
 				s.opt.Logger.Errorf("read message error %v", err)
 			}
 			// io err 关闭链接
-			s.closeConn()
+			s.closeConn("peer close")
 			return
 		}
 
@@ -759,7 +827,7 @@ func (s *frontendSession) drainRead() {
 	}
 }
 
-func (s *frontendSession) closeConn() {
+func (s *frontendSession) closeConn(why string) {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 
@@ -767,7 +835,7 @@ func (s *frontendSession) closeConn() {
 		return
 	}
 
-	s.opt.Logger.Info("close conn")
+	s.opt.Logger.Infof("close conn caused by %s", why)
 
 	// 关闭链接
 	err := s.conn.Close()

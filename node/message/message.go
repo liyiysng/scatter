@@ -91,13 +91,17 @@ type Factor interface {
 
 	// ParseHandShake 解析握手数据
 	ParseHandShake(buf []byte) (h interface{}, err error)
+	// BuildRequestMessage 创建一个请求
+	BuildRequestMessage(sequence int32, srv string, payload []byte) (msg Message, err error)
+	// BuildNotifyMessage 创建一个通知
+	BuildNotifyMessage(srv string, payload []byte) (msg Message, err error)
 }
 
 // GetSrvMethod 获取服务名和方法名
 func GetSrvMethod(service string) (srvName, methodName string, err error) {
-	dot := strings.LastIndex(srvName, ".")
+	dot := strings.LastIndex(service, ".")
 	if dot < 0 {
-		return "", "", errors.New("[frontendSession.handleMsg]: service/method ill-formed: " + service)
+		return "", "", errors.New("[GetSrvMethod]: service/method ill-formed: " + service)
 	}
 	return service[:dot], service[dot+1:], nil
 }
