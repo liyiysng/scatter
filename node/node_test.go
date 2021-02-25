@@ -756,54 +756,6 @@ func TestNodeMsgOpt(t *testing.T) {
 			DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
 			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
 			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas
-			xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
 			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
 		},
 		res,
