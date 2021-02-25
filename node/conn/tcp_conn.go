@@ -41,7 +41,7 @@ func (c *tcpConn) GetSID() int64 {
 	return c.opt.SID
 }
 
-func (c *tcpConn) ReadNextMessage() (msg message.Message, err error) {
+func (c *tcpConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt, err error) {
 
 	//记录读取字节数
 	rdCount := 0
@@ -59,13 +59,15 @@ func (c *tcpConn) ReadNextMessage() (msg message.Message, err error) {
 	}
 	rdCount, err = p.ReadFrom(c.bufIO, c.opt.Compresser, c.opt.MaxLength)
 	if err != nil {
-		return nil, err
+		return nil, message.DEFAULTPOPT, err
 	}
 
 	msg, err = message.MsgFactory.BuildMessage(p.Data)
 	if err != nil {
-		return nil, err
+		return nil, message.DEFAULTPOPT, err
 	}
+
+	popt = p.PacketOpt
 
 	return
 }

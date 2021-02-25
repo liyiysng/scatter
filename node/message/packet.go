@@ -45,22 +45,42 @@ func PackagePoolPut(p *Packet) {
 type PacketOpt byte
 
 const (
+	// DEFAULTPOPT 默认选项
+	DEFAULTPOPT PacketOpt = 0x00
 	// COMPRESS 是否压缩
 	COMPRESS PacketOpt = 0x01
 )
+
+// IPacketOption 包选项
+type IPacketOption interface {
+	Apply(*PacketOpt)
+}
+
+type funcPacketOption struct {
+	f func(*PacketOpt)
+}
+
+func (fdo *funcPacketOption) Apply(do *PacketOpt) {
+	fdo.f(do)
+}
+
+func newFuncPacketOption(f func(*PacketOpt)) *funcPacketOption {
+	return &funcPacketOption{
+		f: f,
+	}
+}
+
+// WithCompressOpt 压缩选项
+func WithCompressOpt() IPacketOption {
+	return newFuncPacketOption(func(o *PacketOpt) {
+		*o |= COMPRESS
+	})
+}
 
 // Packet 一个包含完整消息的数据包
 type Packet struct {
 	PacketOpt PacketOpt
 	Data      []byte
-}
-
-// PacketOptGetter 获取包选项
-type PacketOptGetter func(msg Message) PacketOpt
-
-// DefalutPacketOptGetter 缺省选项
-var DefalutPacketOptGetter PacketOptGetter = func(msg Message) PacketOpt {
-	return 0
 }
 
 // ReadFrom 从reader中读取package

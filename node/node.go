@@ -347,7 +347,6 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		ReadChanSize:      n.opts.readChanBufSize,
 		WriteChanSize:     n.opts.writeChanBufSize,
 		Codec:             n.opts.getCodec(),
-		GetMessageOpt:     n.opts.messageOpt,
 		PushInterceptor:   nil,
 		OnMsgFinish:       n.onMessageFinished,
 		MsgHandleTimeOut:  0,

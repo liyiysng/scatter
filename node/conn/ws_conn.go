@@ -60,7 +60,7 @@ func (c *wsConn) Flush() error {
 	return nil
 }
 
-func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
+func (c *wsConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt, err error) {
 	//记录读取字节数
 	rdCount := 0
 	defer func() {
@@ -78,7 +78,7 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 
 	_, buf, err := c.Conn.ReadMessage()
 	if err != nil {
-		return nil, err
+		return nil, message.DEFAULTPOPT, err
 	}
 	if c.rdBuket != nil {
 		c.rdBuket.Wait(int64(len(buf)))
@@ -86,13 +86,16 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, err error) {
 
 	rdCount, err = p.ReadFrom(bytes.NewBuffer(buf), c.opt.Compresser, c.opt.MaxLength)
 	if err != nil {
-		return nil, err
+		return nil, message.DEFAULTPOPT, err
 	}
 
 	msg, err = message.MsgFactory.BuildMessage(p.Data)
 	if err != nil {
-		return nil, err
+		return nil, message.DEFAULTPOPT, err
 	}
+
+	popt = p.PacketOpt
+
 	return
 }
 

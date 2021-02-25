@@ -148,7 +148,7 @@ func TestNodeHandShake(t *testing.T) {
 
 	n.Stop()
 
-	handShakeAck, err := msgConn.ReadNextMessage()
+	handShakeAck, _, err := msgConn.ReadNextMessage()
 	if err != nil {
 		myLog.Error(err)
 		return
@@ -242,7 +242,7 @@ func createClient(n *Node) (c conn.MsgConn, err error) {
 	}
 
 	// 等待握手完成
-	_, err = msgConn.ReadNextMessage()
+	_, _, err = msgConn.ReadNextMessage()
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func call(c conn.MsgConn, wl sync.Locker, rl sync.Locker, wg *sync.WaitGroup, co
 	wl.Unlock()
 
 	rl.Lock()
-	recvMsg, err := c.ReadNextMessage()
+	recvMsg, _, err := c.ReadNextMessage()
 	rl.Unlock()
 	if err != nil {
 		return err
@@ -468,7 +468,7 @@ func (c *nodeClient) runRead() {
 func (c *nodeClient) readOne() error {
 
 	c.rl.Lock()
-	recvMsg, err := c.c.ReadNextMessage()
+	recvMsg, _, err := c.c.ReadNextMessage()
 	c.rl.Unlock()
 	if err != nil {
 		return err
@@ -498,7 +498,7 @@ func (c *nodeClient) readOne() error {
 	return nil
 }
 
-func (c *nodeClient) call(srv string, req interface{}, res interface{}, popgetter message.PacketOptGetter) (done <-chan struct{}, err error) {
+func (c *nodeClient) call(srv string, req interface{}, res interface{}, popt message.PacketOpt) (done <-chan struct{}, err error) {
 
 	callDone := make(chan struct{})
 
@@ -534,7 +534,7 @@ func (c *nodeClient) call(srv string, req interface{}, res interface{}, popgette
 		}
 	}()
 
-	err = c.wirteOne(msg, popgetter(msg))
+	err = c.wirteOne(msg, popt)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +624,7 @@ func BenchmarkRPC(b *testing.B) {
 					ROP: 10,
 				},
 				res,
-				message.DefalutPacketOptGetter,
+				message.DEFAULTPOPT,
 			)
 			if err != nil {
 				b.Fatal(err)
@@ -719,14 +719,7 @@ func BenchmarkGRPC(b *testing.B) {
 // 消息选项测试
 func TestNodeMsgOpt(t *testing.T) {
 
-	sopt := func(msg message.Message) message.PacketOpt {
-		if msg.GetService() == "ServiceTest.Sum" {
-			return message.COMPRESS
-		}
-		return 0
-	}
-
-	n, err := NewNode(NOptShowHandleLog(false), NOptTraceDetail(false), NOptMessageOpt(sopt), NOptCompress("gzip"))
+	n, err := NewNode(NOptShowHandleLog(true), NOptTraceDetail(false), NOptCompress("gzip"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -814,7 +807,7 @@ func TestNodeMsgOpt(t *testing.T) {
 			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
 		},
 		res,
-		sopt,
+		message.COMPRESS,
 	)
 
 	if err != nil {

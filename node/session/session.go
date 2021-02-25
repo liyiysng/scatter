@@ -7,6 +7,7 @@ import (
 
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/handle"
+	"github.com/liyiysng/scatter/node/message"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,11 +30,11 @@ type Session interface {
 	// Stats 获取客户端状态
 	Stats() State
 	// 向客户端推送消息
-	Push(ctx context.Context, cmd string, v interface{}) error
+	Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 向客户端推送消息
-	PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration) error
+	PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration, popt ...message.IPacketOption) error
 	// 向客户端推送,若发送缓冲已满则会返回 ErrorPushBufferFull
-	PushImmediately(ctx context.Context, cmd string, v interface{}) error
+	PushImmediately(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 关闭回调
 	OnClose(onClose OnClose)
 	// session是否关闭

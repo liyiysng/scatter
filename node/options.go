@@ -8,7 +8,6 @@ import (
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/handle"
-	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/node/textlog"
 
 	//json编码
@@ -75,8 +74,6 @@ type Options struct {
 	writeChanBufSize int
 
 	// 消息设置
-	// 消息选项 , 是否压缩等(当写消息时使用)
-	messageOpt message.PacketOptGetter
 
 	// trace
 	// 允许事件跟踪
@@ -154,7 +151,6 @@ var defaultOptions = Options{
 	showHandleLog:     true,
 	reqTypeValidator:  func(reqType reflect.Type) error { return nil },
 	resTypeValidator:  func(reqType reflect.Type) error { return nil },
-	messageOpt:        message.DefalutPacketOptGetter,
 	readChanBufSize:   1024,
 	writeChanBufSize:  1024,
 }
@@ -221,17 +217,6 @@ func NOptShowHandleLog(show bool) IOption {
 func NOptTraceDetail(trace bool) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.enableTraceDetail = trace
-	})
-}
-
-// NOptMessageOpt 消息选项
-func NOptMessageOpt(op message.PacketOptGetter) IOption {
-	if op == nil {
-		panic("nil message opt")
-	}
-
-	return newFuncServerOption(func(o *Options) {
-		o.messageOpt = op
 	})
 }
 

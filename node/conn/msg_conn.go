@@ -56,7 +56,7 @@ type MsgConnInfo interface {
 type MsgConn interface {
 	MsgConnInfo
 	// ReadNextMessage 获取下一个消息请求
-	ReadNextMessage() (msg message.Message, err error)
+	ReadNextMessage() (msg message.Message, popt message.PacketOpt, err error)
 	// WriteNextMessage 发送一个消息
 	WriteNextMessage(msg message.Message, popt message.PacketOpt) error
 	// Flush 将缓存数据发送对端

@@ -26,8 +26,6 @@ type Option struct {
 	//读写Chan缓冲大小
 	ReadChanSize  int
 	WriteChanSize int
-	// 获取消息选项 , 如某些消息需要压缩等
-	GetMessageOpt message.PacketOptGetter
 	// push拦截
 	PushInterceptor handle.SerrvicePushInterceptor
 	// 编码
@@ -56,7 +54,9 @@ type msgCtx struct {
 	// request , notify , heartbeat , handshake...
 	msgRead message.Message
 	// reponse , push , heatbeatact , handshakeact...
-	msgWrite      message.Message
+	msgWrite message.Message
+	// 是否压缩等
+	popt          message.PacketOpt
 	ctx           context.Context
 	cancel        context.CancelFunc
 	timeoutCancel context.CancelFunc
@@ -89,21 +89,23 @@ var msgCtxPool = sync.Pool{
 	},
 }
 
-func getMsgCtxWithContext(ctx context.Context, enableProfile bool) *msgCtx {
+func getMsgCtxWithContext(ctx context.Context, enableProfile bool, popt message.PacketOpt) *msgCtx {
 	ret := msgCtxPool.Get().(*msgCtx)
 	ret.ctx, ret.cancel = context.WithCancel(ctx)
 	if enableProfile {
 		ret.ctx = withInfo(ret.ctx)
 	}
+	ret.popt = popt
 	return ret
 }
 
-func getMsgCtx(enableProfile bool) *msgCtx {
+func getMsgCtx(enableProfile bool, popt message.PacketOpt) *msgCtx {
 	ret := msgCtxPool.Get().(*msgCtx)
 	ret.ctx, ret.cancel = context.WithCancel(context.Background())
 	if enableProfile {
 		ret.ctx = withInfo(ret.ctx)
 	}
+	ret.popt = popt
 	return ret
 }
 
@@ -174,7 +176,7 @@ func (s *frontendSession) Stats() State {
 	}
 }
 
-func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}) error {
+func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
 	data, err := s.opt.Codec.Marshal(v)
 	if err != nil {
@@ -184,7 +186,16 @@ func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}) e
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
 	}
-	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
+
+	p := message.DEFAULTPOPT
+
+	if len(popt) > 0 {
+		for _, v := range popt {
+			v.Apply(&p)
+		}
+	}
+
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail, p)
 
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
@@ -240,7 +251,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 	}
 }
 
-func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration) error {
+func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
@@ -251,7 +262,15 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interfa
 		return err
 	}
 
-	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
+	p := message.DEFAULTPOPT
+
+	if len(popt) > 0 {
+		for _, v := range popt {
+			v.Apply(&p)
+		}
+	}
+
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail, p)
 
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
@@ -267,7 +286,7 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interfa
 	return s.push(mctx)
 }
 
-func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v interface{}) error {
+func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
 		return constants.ErrSessionClosed
@@ -278,7 +297,15 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 		return err
 	}
 
-	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail)
+	p := message.DEFAULTPOPT
+
+	if len(popt) > 0 {
+		for _, v := range popt {
+			v.Apply(&p)
+		}
+	}
+
+	mctx := getMsgCtxWithContext(ctx, s.opt.EnableTraceDetail, p)
 
 	mctx.msgWrite, err = message.MsgFactory.BuildPushMessage(cmd, data)
 	if err != nil {
@@ -716,7 +743,7 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 
 	s.connMu.Lock()
 	if !s.connClosed {
-		err = s.conn.WriteNextMessage(mctx.msgWrite, s.opt.GetMessageOpt(mctx.msgWrite))
+		err = s.conn.WriteNextMessage(mctx.msgWrite, mctx.popt)
 	} else {
 		err = fmt.Errorf("%v message:{%v}", constants.ErrSessionClosed, mctx.msgWrite)
 	}
@@ -755,7 +782,7 @@ func (s *frontendSession) runRead() {
 	// 2.conn读取消息错误,一半为EOF
 	// 3.链接已关闭
 	for {
-		msg, err := s.conn.ReadNextMessage()
+		msg, popt, err := s.conn.ReadNextMessage()
 		if err != nil {
 			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {
 				s.opt.Logger.Errorf("read message error %v", err)
@@ -765,7 +792,7 @@ func (s *frontendSession) runRead() {
 			return
 		}
 
-		mctx := getMsgCtx(s.opt.EnableTraceDetail)
+		mctx := getMsgCtx(s.opt.EnableTraceDetail, popt)
 		mctx.msgRead = msg
 
 		// 消息存活时间
