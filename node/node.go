@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/liyiysng/scatter/constants"
@@ -44,7 +44,7 @@ type errStore struct {
 type Node struct {
 	mu sync.RWMutex
 	// session ID
-	sIDSequence int64
+	idGen *util.Node
 	// 选项
 	opts Options
 	// 开启时间
@@ -70,7 +70,7 @@ type Node struct {
 }
 
 // NewNode 新建节点
-func NewNode(opt ...IOption) (n *Node, err error) {
+func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 
 	opts := defaultOptions
 	for _, o := range opt {
@@ -81,6 +81,8 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 		return nil, err
 	}
 
+	opts.ID = nid
+
 	// 缺省日志
 	if opts.Logger == nil {
 		if opts.LogPrefix != "" {
@@ -90,12 +92,21 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 		}
 	}
 
+	if opts.Name == "" {
+		opts.Name = strconv.FormatInt(nid, 10)
+	}
+
 	n = &Node{
 		accs:      make(map[acceptor.Acceptor]bool),
 		opts:      opts,
 		startTime: time.Now(),
 		sessions:  make(map[int64]session.FrontendSession),
 		quit:      util.NewEvent(),
+	}
+
+	n.idGen, err = util.NewNode(nid)
+	if err != nil {
+		return nil, err
 	}
 
 	n.srvHandle = handle.NewServiceHandle(&handle.Option{
@@ -109,10 +120,10 @@ func NewNode(opt ...IOption) (n *Node, err error) {
 
 	if opts.enableEventTrace {
 		_, file, line, _ := runtime.Caller(1)
-		n.trEvents = trace.NewEventLog("scatter.Node", fmt.Sprintf("%s-%s:%d", opts.ID, file, line))
+		n.trEvents = trace.NewEventLog("scatter.Node", fmt.Sprintf("%d-%s:%d", opts.ID, file, line))
 	}
 
-	opts.Logger.Infof("start node %s", opts.ID)
+	opts.Logger.Infof("start node %d", opts.ID)
 
 	return
 }
@@ -185,7 +196,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 		Logger:   n.opts.Logger,
 		GetConnOpt: func() conn.MsgConnOption {
 			ret := conn.MsgConnOption{
-				SID:                 atomic.AddInt64(&n.sIDSequence, 1),
+				SID:                 n.idGen.Generate().Int64(),
 				MaxLength:           n.opts.maxPayloadLength,
 				ReadTimeout:         n.opts.readTimeout,
 				WriteTimeout:        n.opts.writeTimeout,
@@ -271,7 +282,7 @@ func (n *Node) Stop() {
 		return
 	}
 
-	n.opts.Logger.Infof("stopping node %s", n.opts.ID)
+	n.opts.Logger.Infof("stopping node %d", n.opts.ID)
 
 	n.quit.Fire()
 
@@ -283,7 +294,7 @@ func (n *Node) Stop() {
 				n.opts.Logger.Errorf("close text log failed %v", err)
 			}
 		}
-		n.opts.Logger.Infof("node %s stoped", n.opts.ID)
+		n.opts.Logger.Infof("node %d stoped", n.opts.ID)
 	}()
 
 	n.mu.Lock()
@@ -336,8 +347,8 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 
 	//指标:链接数
 	if n.opts.metricsConnCountEnabled() {
-		metrics.ReportNodeNewCommingConn(n.opts.ID)
-		defer metrics.ReportNodeNewCommingConn(n.opts.ID)
+		metrics.ReportNodeConnectionInc(n.opts.metricsReporters, n.opts.ID, n.opts.Name)
+		defer metrics.ReportNodeConnectionDec(n.opts.metricsReporters, n.opts.ID, n.opts.Name)
 	}
 
 	// 创建session

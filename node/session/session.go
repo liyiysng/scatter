@@ -18,7 +18,7 @@ var (
 // State 表示session当前状态
 type State struct {
 	SID           int64  `json:"sid"`
-	NID           string `json:"nid"`
+	NID           int64  `json:"nid"`
 	RemoteAddress string `json:"remote_address"`
 }
 

@@ -11,6 +11,8 @@ var (
 	ErrNodeStopped = errors.New("node: the node has been stopped")
 	// ErrMetricNotKnown 未知的指标
 	ErrMetricNotKnown = errors.New("the provided metric does not exist")
+	// ErrReporterClosed 指标回报关闭
+	ErrReporterClosed = errors.New("metric reporter closed")
 
 	// ErrSessionClosed session已关闭
 	ErrSessionClosed = errors.New("session closed")

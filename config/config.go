@@ -3,14 +3,13 @@ package config
 
 import (
 	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 )
 
 // Config is a wrapper around a viper config
 type Config struct {
-	config *viper.Viper
+	*viper.Viper
 }
 
 // NewConfig creates a new config with a given viper config if given
@@ -24,7 +23,7 @@ func NewConfig(cfgs ...*viper.Viper) *Config {
 
 	cfg.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	cfg.AutomaticEnv()
-	c := &Config{config: cfg}
+	c := &Config{Viper: cfg}
 	c.fillDefaultValues()
 	return c
 }
@@ -33,6 +32,11 @@ func (c *Config) fillDefaultValues() {
 	defaultsMap := map[string]interface{}{
 		"scatter.game": "scatter",
 		// metrics config
+		"scatter.metrics.prometheus.collect_type": "push", // push , listen
+		// metrics pusher
+		"scatter.metrics.prometheus.pusher.addr":    ":9091",
+		"scatter.metrics.prometheus.pusher.inteval": "1s",
+		// metrics listen
 		"scatter.metrics.prometheus.port": 8888,
 		"scatter.metrics.additionalTags":  map[string]string{},
 		"scatter.metrics.constTags":       map[string]string{},
@@ -40,48 +44,8 @@ func (c *Config) fillDefaultValues() {
 	}
 
 	for param := range defaultsMap {
-		if c.config.Get(param) == nil {
-			c.config.SetDefault(param, defaultsMap[param])
+		if c.Get(param) == nil {
+			c.SetDefault(param, defaultsMap[param])
 		}
 	}
-}
-
-// GetDuration returns a duration from the inner config
-func (c *Config) GetDuration(s string) time.Duration {
-	return c.config.GetDuration(s)
-}
-
-// GetString returns a string from the inner config
-func (c *Config) GetString(s string) string {
-	return c.config.GetString(s)
-}
-
-// GetInt returns an int from the inner config
-func (c *Config) GetInt(s string) int {
-	return c.config.GetInt(s)
-}
-
-// GetBool returns an boolean from the inner config
-func (c *Config) GetBool(s string) bool {
-	return c.config.GetBool(s)
-}
-
-// GetStringSlice returns a string slice from the inner config
-func (c *Config) GetStringSlice(s string) []string {
-	return c.config.GetStringSlice(s)
-}
-
-// Get returns an interface from the inner config
-func (c *Config) Get(s string) interface{} {
-	return c.config.Get(s)
-}
-
-// GetStringMapString returns a string map string from the inner config
-func (c *Config) GetStringMapString(s string) map[string]string {
-	return c.config.GetStringMapString(s)
-}
-
-// UnmarshalKey unmarshals key into v
-func (c *Config) UnmarshalKey(s string, v interface{}) error {
-	return c.config.UnmarshalKey(s, v)
 }

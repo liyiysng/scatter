@@ -121,7 +121,8 @@ func putMsgCtx(mctx *msgCtx) {
 }
 
 type frontendSession struct {
-	nid string
+	nid int64
+
 	opt *Option
 
 	conn       conn.MsgConn
@@ -148,7 +149,7 @@ type frontendSession struct {
 }
 
 // NewFrontendSession 创建一个session
-func NewFrontendSession(nid string, c conn.MsgConn, opt *Option) FrontendSession {
+func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession {
 	ret := &frontendSession{
 		nid:        nid,
 		conn:       c,

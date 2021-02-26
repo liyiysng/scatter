@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liyiysng/scatter/config"
+	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/node/node_testing"
@@ -28,7 +30,7 @@ func startServer(t *testing.T) (n *Node, err error) {
 		return
 	}
 
-	n, err = NewNode(NOptEnableTextLog(sink))
+	n, err = NewNode(1, NOptEnableTextLog(sink))
 	if err != nil {
 		return
 	}
@@ -100,7 +102,6 @@ func TestNodeHandShake(t *testing.T) {
 	}
 
 	msgConn := conn.NewTCPMsgConn(con, conn.MsgConnOption{
-		SID:                 1,
 		MaxLength:           1024 * 1024,
 		ReadTimeout:         time.Second * 2,
 		WriteTimeout:        time.Second * 2,
@@ -190,7 +191,7 @@ func createNode() (n *Node, err error) {
 	// }
 
 	// n, err = NewNode(NOptEnableTextLog(sink), NOptShowHandleLog(false))
-	n, err = NewNode(NOptShowHandleLog(false), NOptTraceDetail(false))
+	n, err = NewNode(1, NOptShowHandleLog(false), NOptTraceDetail(false))
 	if err != nil {
 		return nil, err
 	}
@@ -215,9 +216,8 @@ func createClient(n *Node) (c conn.MsgConn, err error) {
 	}
 
 	msgConn := conn.NewTCPMsgConn(con, conn.MsgConnOption{
-		SID:                 1,
 		MaxLength:           1024 * 1024,
-		ReadTimeout:         time.Second * 2,
+		ReadTimeout:         time.Second * 20,
 		WriteTimeout:        time.Second * 2,
 		ReadBufferSize:      1024 * 1024 * 4,
 		WriteBufferSize:     1024 * 1024 * 4,
@@ -719,7 +719,7 @@ func BenchmarkGRPC(b *testing.B) {
 // 消息选项测试
 func TestNodeMsgOpt(t *testing.T) {
 
-	n, err := NewNode(NOptShowHandleLog(true), NOptTraceDetail(false), NOptCompress("gzip"))
+	n, err := NewNode(1, NOptShowHandleLog(false), NOptTraceDetail(false), NOptCompress("gzip"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,28 +746,108 @@ func TestNodeMsgOpt(t *testing.T) {
 	defer client.close()
 	go client.runRead()
 
-	res := &node_testing.SumRes{}
+	for i := 0; i < 10; i++ {
+		res := &node_testing.SumRes{}
 
-	done, err := client.call(
-		"ServiceTest.Sum",
-		&node_testing.SumReq{
-			LOP: 10,
-			ROP: 10,
-			DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-			--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-			hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-			ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
-		},
-		res,
-		message.COMPRESS,
+		done, err := client.call(
+			"ServiceTest.Sum",
+			&node_testing.SumReq{
+				LOP: 10,
+				ROP: 10,
+				DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+				--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+				hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+				ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
+			},
+			res,
+			message.COMPRESS,
+		)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		<-done
+
+		t.Log(res)
+	}
+
+}
+
+// 指标测试
+func TestNodeMetrics(t *testing.T) {
+
+	reporter, err := metrics.NewPrometheusReporter("node_metrics", config.NewConfig(), map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reporter.Close()
+
+	go func() {
+		for {
+			metrics.ReportSysMetrics([]metrics.Reporter{reporter}, time.Second)
+		}
+	}()
+
+	n, err := NewNode(
+		1,
+		NOptShowHandleLog(false),
+		NOptTraceDetail(false),
+		NOptCompress("gzip"),
+		NOptMetricsReporter(reporter),
+		NOptEnableMetrics(true),
+		NOptNodeName("test_node"),
 	)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	<-done
+	defer n.Stop()
 
-	t.Log(res)
+	n.Register(&ServiceTest{})
 
+	srvNode(n)
+
+	// 确保node启动
+	time.Sleep(time.Second)
+
+	// 创建客户端
+	conn, err := createClient(n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &nodeClient{
+		codec:      n.opts.getCodec(),
+		c:          conn,
+		closeEvent: util.NewEvent(),
+	}
+	defer client.close()
+	go client.runRead()
+
+	for i := 0; i < 10; i++ {
+		res := &node_testing.SumRes{}
+
+		done, err := client.call(
+			"ServiceTest.Sum",
+			&node_testing.SumReq{
+				LOP: 10,
+				ROP: 10,
+				DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
+				--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
+				hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
+				ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
+			},
+			res,
+			message.COMPRESS,
+		)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		<-done
+		time.Sleep(time.Second * 5)
+
+		t.Log(res)
+	}
 }

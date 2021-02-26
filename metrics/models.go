@@ -1,7 +1,5 @@
 package metrics
 
-import "github.com/liyiysng/scatter/config"
-
 // Summary defines a summary metric
 type Summary struct {
 	Subsystem  string
@@ -32,16 +30,4 @@ type CustomMetricsSpec struct {
 	Summaries []*Summary
 	Gauges    []*Gauge
 	Counters  []*Counter
-}
-
-// NewCustomMetricsSpec returns a *CustomMetricsSpec by reading config key
-func NewCustomMetricsSpec(config *config.Config) (*CustomMetricsSpec, error) {
-	var spec CustomMetricsSpec
-
-	err := config.UnmarshalKey("scatter.metrics.custom", &spec)
-	if err != nil {
-		return nil, err
-	}
-
-	return &spec, nil
 }

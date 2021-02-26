@@ -7,6 +7,7 @@ import (
 
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
+	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/textlog"
 
@@ -29,7 +30,7 @@ const (
 type Options struct {
 	// 基础选项
 	// ID 节点ID
-	ID string
+	ID int64
 	// 节点名
 	Name string
 	// 日志前缀
@@ -87,6 +88,8 @@ type Options struct {
 	metricsConnCountEnable bool
 	// 读/写字节数
 	metricsReadWriteBytesCountEnable bool
+	// repoters
+	metricsReporters []metrics.Reporter
 
 	// rpc
 	// 請求類型驗證
@@ -224,5 +227,27 @@ func NOptTraceDetail(trace bool) IOption {
 func NOptCompress(c string) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.compresser = c
+	})
+}
+
+// NOptMetricsReporter 指标提交
+func NOptMetricsReporter(r metrics.Reporter) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.metricsReporters = append(o.metricsReporters, r)
+	})
+}
+
+// NOptEnableMetrics 指标监视
+func NOptEnableMetrics(enable bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.metricsEnable = enable
+		o.metricsConnCountEnable = enable
+	})
+}
+
+// NOptNodeName 指标监视
+func NOptNodeName(nname string) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.Name = nname
 	})
 }
