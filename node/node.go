@@ -211,10 +211,10 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 			// 读写字节数指标
 			if n.opts.metricsReadWriteBytesCountEnabled() {
 				ret.ReadCountReport = func(info conn.MsgConnInfo, byteCount int) {
-
+					metrics.ReportNodeReadBytes(n.opts.metricsReporters, n.opts.ID, n.opts.Name, byteCount)
 				}
 				ret.WriteCountReport = func(info conn.MsgConnInfo, byteCount int) {
-
+					metrics.ReportNodeWriteBytes(n.opts.metricsReporters, n.opts.ID, n.opts.Name, byteCount)
 				}
 			}
 
@@ -358,6 +358,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		ReadChanSize:      n.opts.readChanBufSize,
 		WriteChanSize:     n.opts.writeChanBufSize,
 		Codec:             n.opts.getCodec(),
+		RateLimitMsgProc:  n.opts.rateLimitMsgProcNum,
 		PushInterceptor:   nil,
 		OnMsgFinish:       n.onMessageFinished,
 		MsgHandleTimeOut:  0,
@@ -407,6 +408,10 @@ func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvNa
 		session.SetWritePayloadObj(ctx, res)
 	}
 
+	if n.opts.metricsMsgProcDelayEnabled() {
+		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Now().Sub(beg))
+	}
+
 	return err
 }
 
@@ -423,6 +428,10 @@ func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srv
 	// trace
 	if n.opts.enableTraceDetail {
 		session.SetReadPayloadObj(ctx, req)
+	}
+
+	if n.opts.metricsMsgProcDelayEnabled() {
+		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Now().Sub(beg))
 	}
 
 	return err

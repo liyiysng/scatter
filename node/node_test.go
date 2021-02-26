@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -483,6 +484,7 @@ func (c *nodeClient) readOne() error {
 		if call.done != nil {
 			close(call.done)
 		}
+
 		c.wg.Done()
 	} else {
 		c.mu.Unlock()
@@ -523,6 +525,7 @@ func (c *nodeClient) call(srv string, req interface{}, res interface{}, popt mes
 		res:  res,
 		done: callDone,
 	}
+	c.wg.Add(1)
 	c.mu.Unlock()
 
 	defer func() {
@@ -556,8 +559,6 @@ func (c *nodeClient) wirteOne(msg message.Message, popt message.PacketOpt) error
 		return err
 	}
 
-	c.wg.Add(1)
-
 	return nil
 }
 
@@ -582,7 +583,7 @@ func BenchmarkRPC(b *testing.B) {
 	// 确保node启动
 	time.Sleep(time.Second)
 
-	clientCount := 10
+	clientCount := 1000
 
 	clients := make([]*nodeClient, clientCount)
 
@@ -774,9 +775,55 @@ func TestNodeMsgOpt(t *testing.T) {
 
 }
 
+type ServiceMetricsTest struct {
+}
+
+func (srv *ServiceMetricsTest) Foo1(ctx context.Context, session session.Session, req *node_testing.SumReq) (res *node_testing.SumRes, err error) {
+
+	res = &node_testing.SumRes{
+		Sum: req.LOP + req.ROP,
+	}
+
+	time.Sleep(time.Millisecond * time.Duration(rand.Int31n(5)))
+
+	return
+}
+
+func (srv *ServiceMetricsTest) Foo2(ctx context.Context, session session.Session, req *node_testing.SumReq) (res *node_testing.SumRes, err error) {
+
+	res = &node_testing.SumRes{
+		Sum: req.LOP + req.ROP,
+	}
+
+	time.Sleep(time.Millisecond * time.Duration(rand.Int31n(10)))
+
+	return
+}
+
+func (srv *ServiceMetricsTest) Foo3(ctx context.Context, session session.Session, req *node_testing.SumReq) (res *node_testing.SumRes, err error) {
+
+	res = &node_testing.SumRes{
+		Sum: req.LOP + req.ROP,
+	}
+
+	time.Sleep(time.Millisecond * time.Duration(rand.Int31n(15)))
+
+	return
+}
+
+func (srv *ServiceMetricsTest) Foo4(ctx context.Context, session session.Session, req *node_testing.SumReq) (res *node_testing.SumRes, err error) {
+
+	res = &node_testing.SumRes{
+		Sum: req.LOP + req.ROP,
+	}
+
+	time.Sleep(time.Millisecond * time.Duration(rand.Int31n(20)))
+
+	return
+}
+
 // 指标测试
 func TestNodeMetrics(t *testing.T) {
-
 	reporter, err := metrics.NewPrometheusReporter("node_metrics", config.NewConfig(), map[string]string{})
 	if err != nil {
 		t.Fatal(err)
@@ -804,50 +851,83 @@ func TestNodeMetrics(t *testing.T) {
 
 	defer n.Stop()
 
-	n.Register(&ServiceTest{})
+	n.Register(&ServiceMetricsTest{})
 
 	srvNode(n)
 
 	// 确保node启动
 	time.Sleep(time.Second)
 
-	// 创建客户端
-	conn, err := createClient(n)
-	if err != nil {
-		t.Fatal(err)
+	wwg := sync.WaitGroup{}
+
+	srvs := []string{
+		"ServiceMetricsTest.Foo1",
+		"ServiceMetricsTest.Foo2",
+		"ServiceMetricsTest.Foo3",
+		"ServiceMetricsTest.Foo4",
 	}
-	client := &nodeClient{
-		codec:      n.opts.getCodec(),
-		c:          conn,
-		closeEvent: util.NewEvent(),
-	}
-	defer client.close()
-	go client.runRead()
+
+	finish := util.NewEvent()
+
+	go func() {
+		time.Sleep(time.Second * 400)
+		finish.Fire()
+	}()
 
 	for i := 0; i < 10; i++ {
-		res := &node_testing.SumRes{}
 
-		done, err := client.call(
-			"ServiceTest.Sum",
-			&node_testing.SumReq{
-				LOP: 10,
-				ROP: 10,
-				DataStr: `xxxxxxxxxxxxxxxffffffffffffffffffffffffffffff--------------------------
-				--------------ssssssssssssssssssssssssssssssabfoabhfoasbfobaogfbhodhgosd
-				hgoidshoghdshgoidshgoidshogihsdihgosdhgosdhgoihsdighoisdhgoishdgoihsdigh
-				ohfoiahfohaofhoashfoashfoashfoahsofhaoshfoas`,
-			},
-			res,
-			message.COMPRESS,
-		)
+		go func() {
 
-		if err != nil {
-			t.Fatal(err)
-		}
+			wwg.Add(1)
+			defer wwg.Done()
 
-		<-done
-		time.Sleep(time.Second * 5)
+			// 创建客户端
+			conn, err := createClient(n)
+			if err != nil {
+				myLog.Error(err)
+				return
+			}
+			client := &nodeClient{
+				codec:      n.opts.getCodec(),
+				c:          conn,
+				closeEvent: util.NewEvent(),
+			}
+			defer client.close()
+			go client.runRead()
 
-		t.Log(res)
+			for {
+
+				if finish.HasFired() {
+					return
+				}
+
+				res := &node_testing.SumRes{}
+
+				done, err := client.call(
+					srvs[rand.Intn(len(srvs))],
+					&node_testing.SumReq{
+						LOP:     10,
+						ROP:     10,
+						DataStr: `xxxxxxxxxxxxxxx`,
+					},
+					res,
+					message.COMPRESS,
+				)
+
+				if err != nil {
+					myLog.Error(err)
+					return
+				}
+
+				<-done
+				time.Sleep(time.Second * 10)
+
+				t.Log(res)
+			}
+		}()
+
 	}
+
+	wwg.Wait()
+
 }

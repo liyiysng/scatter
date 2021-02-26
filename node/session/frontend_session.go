@@ -15,6 +15,7 @@ import (
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
+	"github.com/liyiysng/scatter/ratelimit"
 	"github.com/liyiysng/scatter/util"
 )
 
@@ -23,9 +24,12 @@ type Option struct {
 	Logger logger.Logger
 	// 链接超时(当链接创建后多久事件未接受到handshake消息)
 	ConnectTimeout time.Duration
-	//读写Chan缓冲大小
+	// 读写Chan缓冲大小
 	ReadChanSize  int
 	WriteChanSize int
+	// 限制每秒消息处理
+	// <=0 不受限制
+	RateLimitMsgProc int64
 	// push拦截
 	PushInterceptor handle.SerrvicePushInterceptor
 	// 编码
@@ -125,6 +129,8 @@ type frontendSession struct {
 
 	opt *Option
 
+	rateLimt *ratelimit.Bucket
+
 	conn       conn.MsgConn
 	connClosed bool
 	connMu     sync.Mutex
@@ -159,12 +165,14 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession 
 		closeEvent: util.NewEvent(),
 	}
 
-	wg := util.WaitGroupWrapper{}
+	if ret.opt.RateLimitMsgProc > 0 {
+		ret.rateLimt = ratelimit.NewBucketWithQuantum(time.Second, ret.opt.RateLimitMsgProc, ret.opt.RateLimitMsgProc)
+	}
 
 	// 读取消息
-	wg.Wrap(ret.runRead, ret.opt.Logger.Errorf)
+	ret.wg.Wrap(ret.runRead, ret.opt.Logger.Errorf)
 	// 写消息
-	wg.Wrap(ret.runWrite, ret.opt.Logger.Errorf)
+	ret.wg.Wrap(ret.runWrite, ret.opt.Logger.Errorf)
 
 	return ret
 }
@@ -783,6 +791,12 @@ func (s *frontendSession) runRead() {
 	// 2.conn读取消息错误,一半为EOF
 	// 3.链接已关闭
 	for {
+
+		// 消息限流
+		if s.rateLimt != nil {
+			s.rateLimt.Wait(1)
+		}
+
 		msg, popt, err := s.conn.ReadNextMessage()
 		if err != nil {
 			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {

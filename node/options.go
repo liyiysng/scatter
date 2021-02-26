@@ -69,6 +69,9 @@ type Options struct {
 	rateLimitReadBytes int64
 	// 写限流
 	rateLimitWriteBytes int64
+	// 限制单个链接每秒消息处理个数
+	// <=0 不做限制
+	rateLimitMsgProcNum int64
 	// 读chan缓冲
 	readChanBufSize int
 	// 写chan缓冲
@@ -88,6 +91,8 @@ type Options struct {
 	metricsConnCountEnable bool
 	// 读/写字节数
 	metricsReadWriteBytesCountEnable bool
+	// 消息处理延时
+	metricsMsgProcDelayEnable bool
 	// repoters
 	metricsReporters []metrics.Reporter
 
@@ -124,6 +129,13 @@ func (o *Options) metricsReadWriteBytesCountEnabled() bool {
 		return false
 	}
 	return o.metricsReadWriteBytesCountEnable
+}
+
+func (o *Options) metricsMsgProcDelayEnabled() bool {
+	if !o.metricsEnable {
+		return false
+	}
+	return o.metricsMsgProcDelayEnable
 }
 
 func (o *Options) getCompressor() encoding.Compressor {
@@ -242,6 +254,8 @@ func NOptEnableMetrics(enable bool) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.metricsEnable = enable
 		o.metricsConnCountEnable = enable
+		o.metricsReadWriteBytesCountEnable = enable
+		o.metricsMsgProcDelayEnable = enable
 	})
 }
 
@@ -249,5 +263,12 @@ func NOptEnableMetrics(enable bool) IOption {
 func NOptNodeName(nname string) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.Name = nname
+	})
+}
+
+// NOptProcMsgNumRateLimit 单个链接每秒消息处理个数限制
+func NOptProcMsgNumRateLimit(num int64) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.rateLimitMsgProcNum = num
 	})
 }
