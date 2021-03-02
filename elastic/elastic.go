@@ -3,5 +3,5 @@ package elastic
 import "github.com/liyiysng/scatter/logger"
 
 var (
-	myLog = logger.Component("session")
+	myLog = logger.Component("elastic")
 )

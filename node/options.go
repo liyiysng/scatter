@@ -10,6 +10,7 @@ import (
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/textlog"
+	"github.com/olivere/elastic/v7"
 
 	//json编码
 	_ "github.com/liyiysng/scatter/encoding/json"
@@ -41,10 +42,12 @@ type Options struct {
 	showHandleLog bool
 
 	// 文件日志
-	// 是否记录消息详情
-	needTextLog bool
-	// 消息详情文件路径
-	textLogWriter textlog.Sink
+	// 文件详情记录
+	needFileTextLog bool
+	// es详情记录
+	needEsTextLog bool
+	// 消息详情日志
+	textLogWriter []textlog.Sink
 
 	// 链接设置
 	// 缓冲设置
@@ -103,10 +106,13 @@ type Options struct {
 	resTypeValidator func(reqType reflect.Type) error
 	// 可选参数
 	optArgs *handle.OptionalArgs
+
+	// 配置错误
+	lastError error
 }
 
 func (o *Options) validate() error {
-	if o.needTextLog && !o.enableTraceDetail {
+	if (o.needFileTextLog || o.needEsTextLog) && !o.enableTraceDetail {
 		return fmt.Errorf("want text log , but trace detail was disabled")
 	}
 
@@ -196,18 +202,50 @@ func newFuncServerOption(f func(*Options)) *funcOption {
 // The default value for this buffer is 32KB.
 func NOptWriteBufferSize(s int) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.writeBufferSize = s
 	})
 }
 
-// NOptEnableTextLog 开启文本日志
-func NOptEnableTextLog(sink textlog.Sink) IOption {
-	if sink == nil {
-		panic("[EnableTextLog] nil sink")
-	}
+// NOptEnableEnableFileTextLog 开启文件文本日志
+func NOptEnableEnableFileTextLog() IOption {
 	return newFuncServerOption(func(o *Options) {
-		o.needTextLog = true
-		o.textLogWriter = sink
+		if o.needFileTextLog {
+			return
+		}
+		if o.lastError != nil {
+			return
+		}
+		sink, err := textlog.NewTempFileSink()
+		if err != nil {
+			o.lastError = err
+			return
+		}
+		o.needFileTextLog = true
+		o.enableTraceDetail = true
+		o.textLogWriter = append(o.textLogWriter, sink)
+	})
+}
+
+// NOptEnableEnableEsTextLog 开启es文本日志
+func NOptEnableEnableEsTextLog(index string, numBulk int, flushInverval time.Duration, options ...elastic.ClientOptionFunc) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.needEsTextLog {
+			return
+		}
+		if o.lastError != nil {
+			return
+		}
+		sink, err := textlog.NewEsSink(index, numBulk, flushInverval, options...)
+		if err != nil {
+			o.lastError = err
+			return
+		}
+		o.needEsTextLog = true
+		o.enableTraceDetail = true
+		o.textLogWriter = append(o.textLogWriter, sink)
 	})
 }
 
@@ -217,6 +255,9 @@ func NOptWithOptArgs(optArgs *handle.OptionalArgs) IOption {
 		panic("[WithOptArgs] nil param")
 	}
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.optArgs = optArgs
 	})
 }
@@ -224,6 +265,9 @@ func NOptWithOptArgs(optArgs *handle.OptionalArgs) IOption {
 // NOptShowHandleLog 是否显示处理日志
 func NOptShowHandleLog(show bool) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.showHandleLog = show
 	})
 }
@@ -231,6 +275,9 @@ func NOptShowHandleLog(show bool) IOption {
 // NOptTraceDetail 是否监视细节
 func NOptTraceDetail(trace bool) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.enableTraceDetail = trace
 	})
 }
@@ -238,6 +285,9 @@ func NOptTraceDetail(trace bool) IOption {
 // NOptCompress 压缩算法
 func NOptCompress(c string) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.compresser = c
 	})
 }
@@ -245,6 +295,9 @@ func NOptCompress(c string) IOption {
 // NOptMetricsReporter 指标提交
 func NOptMetricsReporter(r metrics.Reporter) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.metricsReporters = append(o.metricsReporters, r)
 	})
 }
@@ -252,6 +305,9 @@ func NOptMetricsReporter(r metrics.Reporter) IOption {
 // NOptEnableMetrics 指标监视
 func NOptEnableMetrics(enable bool) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.metricsEnable = enable
 		o.metricsConnCountEnable = enable
 		o.metricsReadWriteBytesCountEnable = enable
@@ -262,6 +318,9 @@ func NOptEnableMetrics(enable bool) IOption {
 // NOptNodeName 指标监视
 func NOptNodeName(nname string) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.Name = nname
 	})
 }
@@ -269,6 +328,9 @@ func NOptNodeName(nname string) IOption {
 // NOptProcMsgNumRateLimit 单个链接每秒消息处理个数限制
 func NOptProcMsgNumRateLimit(num int64) IOption {
 	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
 		o.rateLimitMsgProcNum = num
 	})
 }

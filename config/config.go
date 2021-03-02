@@ -2,9 +2,15 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/liyiysng/scatter/logger"
 	"github.com/spf13/viper"
+)
+
+var (
+	myLog = logger.Component("config")
 )
 
 // Config is a wrapper around a viper config
@@ -28,7 +34,20 @@ func NewConfig(cfgs ...*viper.Viper) *Config {
 	return c
 }
 
+// ConfigValid 配置是否正确
+func (c *Config) ConfigValid() error {
+
+	if c.Get("scatter.es.write_index") != c.Get("scatter.es.template.settings.index.lifecycle.rollover_alias") {
+		return fmt.Errorf("scatter.es.write_index must same as scatter.es.template.settings.index.lifecycle.rollover_alias")
+	}
+
+	return nil
+}
+
 func (c *Config) fillDefaultValues() {
+
+	writeIndexName := "scatter_write"
+
 	defaultsMap := map[string]interface{}{
 		"scatter.game": "scatter",
 		// metrics config
@@ -41,6 +60,35 @@ func (c *Config) fillDefaultValues() {
 		"scatter.metrics.additionalTags":  map[string]string{},
 		"scatter.metrics.constTags":       map[string]string{},
 		"scatter.metrics.custom":          map[string]interface{}{},
+
+		// es settings ////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////
+		"scatter.es.url":             "http://localhost:9200",
+		"scatter.es.init_index_name": "<scatter-{now/d}-1>",
+		"scatter.es.write_index":     writeIndexName,
+		// 生命周期
+		"scatter.es.lifecycle_name": "scatter_lifecycle_policy",
+		// hot
+		"scatter.es.lifecycle.policy.phases.hot.min_age":                       "0ms",
+		"scatter.es.lifecycle.policy.phases.hot.actions.rollover.max_age":      "30d",  // 热数据时间
+		"scatter.es.lifecycle.policy.phases.hot.actions.rollover.max_size":     "50gb", // 热数据大小
+		"scatter.es.lifecycle.policy.phases.hot.actions.rollover.max_docs":     10000,  // 热数据个数
+		"scatter.es.lifecycle.policy.phases.hot.actions.set_priority.priority": 100,
+		// delete
+		"scatter.es.lifecycle.policy.phases.delete.min_age":        "100d",     // 多久后删除
+		"scatter.es.lifecycle.policy.phases.delete.actions.delete": struct{}{}, // 若要删除,徐保留
+		////////////////////////////////////////////////////////////////
+		// 模板
+		"scatter.es.template_name":           "scatter_template",
+		"scatter.es.template.index_patterns": "scatter-*",
+		// 设置
+		"scatter.es.template.settings.number_of_shards":               1,
+		"scatter.es.template.settings.number_of_replicas":             1,
+		"scatter.es.template.settings.index.lifecycle.name":           "scatter_lifecycle_policy",
+		"scatter.es.template.settings.index.lifecycle.rollover_alias": writeIndexName,
+		// 别名(别名为scatters)
+		"scatter.es.template.aliases.scatters": struct{}{},
+		// mappings
 	}
 
 	for param := range defaultsMap {

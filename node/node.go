@@ -77,6 +77,10 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		o.apply(&opts)
 	}
 
+	if opts.lastError != nil {
+		return nil, opts.lastError
+	}
+
 	if err = opts.validate(); err != nil {
 		return nil, err
 	}
@@ -288,11 +292,14 @@ func (n *Node) Stop() {
 
 	defer func() {
 		n.waitGroup.Wait()
-		if n.opts.needTextLog && n.opts.textLogWriter != nil {
-			err := n.opts.textLogWriter.Close()
-			if err != nil {
-				n.opts.Logger.Errorf("close text log failed %v", err)
+		if n.opts.textLogWriter != nil && len(n.opts.textLogWriter) > 0 {
+			for _, v := range n.opts.textLogWriter {
+				err := v.Close()
+				if err != nil {
+					n.opts.Logger.Errorf("close text log failed %v", err)
+				}
 			}
+
 		}
 		n.opts.Logger.Infof("node %d stoped", n.opts.ID)
 	}()
@@ -438,13 +445,13 @@ func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srv
 }
 
 func (n *Node) onMessageFinished(ctx context.Context) {
-	if n.opts.needTextLog && n.opts.textLogWriter != nil {
+	if len(n.opts.textLogWriter) > 0 {
 		if info, ok := session.MsgInfoFromContext(ctx); ok {
-			err := n.opts.textLogWriter.Write(info)
-			if err != nil {
-				n.opts.Logger.Errorf("[Node.onMessageFinished] write text log faild %v", err)
-				n.opts.needTextLog = false
-				return
+			for _, v := range n.opts.textLogWriter {
+				err := v.Write(info)
+				if err != nil {
+					n.opts.Logger.Errorf("[Node.onMessageFinished] write text log faild %v", err)
+				}
 			}
 		}
 	}

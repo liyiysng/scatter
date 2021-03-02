@@ -12,6 +12,10 @@ import (
 
 // MsgInfo 消息信息
 type MsgInfo struct {
+
+	// 开始时间
+	StartTime time.Time
+
 	// 消息处理完成时间
 	FinishTime time.Time
 	// 错误信息
@@ -39,29 +43,41 @@ type MsgInfo struct {
 
 type jsonFormatInfo struct {
 
+	// 开始时间
+	StartTime time.Time `json:"@timestamp"`
+
+	// 消息类型
+	MsgType message.MsgType `json:"msg_type"`
+
+	// 服务
+	Srv string `json:"srv"`
+
+	// 方法
+	Method string `json:"method"`
+
 	// 请求/notify
 	MsgRead string `json:"msg_read"`
 	// 消息读取时间
-	ReadTime time.Time `json:"read_time"`
+	ReadTime float32 `json:"read_time_us"`
 
 	// 开始处理时间
-	BeginHandleTime time.Time `json:"begin_handle_time"`
+	BeginHandleTime float32 `json:"begin_handle_time_us"`
 	// 处理完成时间
-	EndHandleTime time.Time `json:"end_handle_time"`
+	EndHandleTime float32 `json:"end_handle_time_us"`
 
 	// 回复/push
 	MsgWrite string `json:"msg_write"`
 	// 消息写入chan时间
-	SendToChanTime time.Time `json:"send_to_chan_time"`
+	SendToChanTime float32 `json:"send_to_chan_time_us"`
 
 	// 消息处理完成时间
-	FinishTime time.Time `json:"finish_time"`
+	FinishTime float32 `json:"finish_time_us"`
 	// 错误信息
 	Error string `json:"error"`
 }
 
-func (info *MsgInfo) String() string {
-
+// MarshalJSON json marshal
+func (info *MsgInfo) MarshalJSON() ([]byte, error) {
 	sb := strings.Builder{}
 
 	errStr := ""
@@ -94,22 +110,57 @@ func (info *MsgInfo) String() string {
 	}
 
 	js := &jsonFormatInfo{
-		FinishTime:      info.FinishTime,
-		Error:           errStr,
-		MsgWrite:        msgWriteStr,
-		SendToChanTime:  info.SendToChanTime,
-		MsgRead:         msgReadStr,
-		ReadTime:        info.ReadTime,
-		BeginHandleTime: info.BeginHandleTime,
-		EndHandleTime:   info.EndHandleTime,
+		StartTime: info.StartTime,
+		Error:     errStr,
+		MsgWrite:  msgWriteStr,
+		MsgRead:   msgReadStr,
+	}
+
+	// time
+	if !info.FinishTime.IsZero() {
+		js.FinishTime = float32(info.FinishTime.Sub(info.StartTime).Microseconds())
+	}
+	if !info.SendToChanTime.IsZero() {
+		js.SendToChanTime = float32(info.SendToChanTime.Sub(info.StartTime).Microseconds())
+	}
+	if !info.ReadTime.IsZero() {
+		js.ReadTime = float32(info.ReadTime.Sub(info.StartTime).Microseconds())
+	}
+	if !info.BeginHandleTime.IsZero() {
+		js.BeginHandleTime = float32(info.BeginHandleTime.Sub(info.StartTime).Microseconds())
+	}
+	if !info.EndHandleTime.IsZero() {
+		js.EndHandleTime = float32(info.EndHandleTime.Sub(info.StartTime).Microseconds())
+	}
+
+	if info.MsgRead != nil {
+		js.MsgType = info.MsgRead.GetMsgType()
+		serviceName, methodName, err := message.GetSrvMethod(info.MsgRead.GetService())
+		if err != nil {
+			myLog.Errorf("[MsgInfo.MarshalJSON] get srv failed %v", err)
+		} else {
+			js.Srv = serviceName
+			js.Method = methodName
+		}
+
+	} else {
+		js.Method = info.MsgWrite.GetService()
+		js.MsgType = message.PUSH
 	}
 
 	str, err := json.MarshalIndent(js, "", "\t")
 	if err != nil {
-		myLog.Errorf("[MsgInfo.String] %v", err)
-		return "marshal failed"
+		return nil, fmt.Errorf("[MsgInfo.MarshalJSON] %v", err)
 	}
-	return string(str)
+	return []byte(str), err
+}
+
+func (info *MsgInfo) String() string {
+	b, err := info.MarshalJSON()
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
 }
 
 type sessionContextKey string
@@ -121,6 +172,7 @@ const (
 
 func withInfo(ctx context.Context) context.Context {
 	info := &MsgInfo{}
+	info.StartTime = time.Now()
 	return context.WithValue(ctx, _msgInfo, info)
 }
 

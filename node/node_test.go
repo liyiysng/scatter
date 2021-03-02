@@ -18,20 +18,14 @@ import (
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/node/node_testing"
 	"github.com/liyiysng/scatter/node/session"
-	"github.com/liyiysng/scatter/node/textlog"
 	"github.com/liyiysng/scatter/util"
+	"github.com/olivere/elastic/v7"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding"
 )
 
 func startServer(t *testing.T) (n *Node, err error) {
-
-	sink, err := textlog.NewTempFileSink()
-	if err != nil {
-		return
-	}
-
-	n, err = NewNode(1, NOptEnableTextLog(sink))
+	n, err = NewNode(1, NOptEnableEnableFileTextLog())
 	if err != nil {
 		return
 	}
@@ -921,6 +915,112 @@ func TestNodeMetrics(t *testing.T) {
 
 				<-done
 				time.Sleep(time.Second * 10)
+
+				t.Log(res)
+			}
+		}()
+
+	}
+
+	wwg.Wait()
+
+}
+
+func TestNodeEsSink(t *testing.T) {
+
+	cfg := config.NewConfig()
+
+	n, err := NewNode(
+		1,
+		NOptShowHandleLog(false),
+		NOptTraceDetail(false),
+		NOptCompress("gzip"),
+		NOptEnableMetrics(true),
+		NOptNodeName("test_node"),
+		NOptEnableEnableEsTextLog(
+			cfg.GetString("scatter.es.write_index"),
+			100, time.Second,
+			elastic.SetURL(cfg.GetString("scatter.es.url")),
+			elastic.SetSniff(false),
+			//elastic.SetTraceLog(log.New(os.Stderr, "", log.LstdFlags))
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer n.Stop()
+
+	n.Register(&ServiceMetricsTest{})
+
+	srvNode(n)
+
+	// 确保node启动
+	time.Sleep(time.Second)
+
+	wwg := sync.WaitGroup{}
+
+	srvs := []string{
+		"ServiceMetricsTest.Foo1",
+		"ServiceMetricsTest.Foo2",
+		"ServiceMetricsTest.Foo3",
+		"ServiceMetricsTest.Foo4",
+	}
+
+	finish := util.NewEvent()
+
+	go func() {
+		time.Sleep(time.Second * 400)
+		finish.Fire()
+	}()
+
+	for i := 0; i < 10; i++ {
+
+		go func() {
+
+			wwg.Add(1)
+			defer wwg.Done()
+
+			// 创建客户端
+			conn, err := createClient(n)
+			if err != nil {
+				myLog.Error(err)
+				return
+			}
+			client := &nodeClient{
+				codec:      n.opts.getCodec(),
+				c:          conn,
+				closeEvent: util.NewEvent(),
+			}
+			defer client.close()
+			go client.runRead()
+
+			for {
+
+				if finish.HasFired() {
+					return
+				}
+
+				res := &node_testing.SumRes{}
+
+				done, err := client.call(
+					srvs[rand.Intn(len(srvs))],
+					&node_testing.SumReq{
+						LOP:     10,
+						ROP:     10,
+						DataStr: `xxxxxxxxxxxxxxx`,
+					},
+					res,
+					message.COMPRESS,
+				)
+
+				if err != nil {
+					myLog.Error(err)
+					return
+				}
+
+				<-done
+				time.Sleep(time.Second * 1)
 
 				t.Log(res)
 			}
