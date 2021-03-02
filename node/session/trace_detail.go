@@ -135,14 +135,15 @@ func (info *MsgInfo) MarshalJSON() ([]byte, error) {
 
 	if info.MsgRead != nil {
 		js.MsgType = info.MsgRead.GetMsgType()
-		serviceName, methodName, err := message.GetSrvMethod(info.MsgRead.GetService())
-		if err != nil {
-			myLog.Errorf("[MsgInfo.MarshalJSON] get srv failed %v", err)
-		} else {
-			js.Srv = serviceName
-			js.Method = methodName
+		if info.MsgRead.GetService() != "" {
+			serviceName, methodName, err := message.GetSrvMethod(info.MsgRead.GetService())
+			if err != nil {
+				myLog.Errorf("[MsgInfo.MarshalJSON] get srv failed %v", err)
+			} else {
+				js.Srv = serviceName
+				js.Method = methodName
+			}
 		}
-
 	} else {
 		js.Method = info.MsgWrite.GetService()
 		js.MsgType = message.PUSH

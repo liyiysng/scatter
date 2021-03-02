@@ -63,7 +63,7 @@ func (c *Config) fillDefaultValues() {
 
 		// es settings ////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////
-		"scatter.es.url":             "http://localhost:9200",
+		"scatter.es.url":             []string{"http://localhost:9200"},
 		"scatter.es.init_index_name": "<scatter-{now/d}-1>",
 		"scatter.es.write_index":     writeIndexName,
 		// 生命周期

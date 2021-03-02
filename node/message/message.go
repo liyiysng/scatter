@@ -3,6 +3,7 @@ package message
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/liyiysng/scatter/logger"
@@ -53,6 +54,11 @@ var msgTypes = map[MsgType]string{
 
 func (mt MsgType) String() string {
 	return msgTypes[mt]
+}
+
+// MarshalJSON json marshal
+func (mt *MsgType) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%q", msgTypes[*mt])), nil
 }
 
 // MsgFactory 消息工厂

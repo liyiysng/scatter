@@ -940,7 +940,7 @@ func TestNodeEsSink(t *testing.T) {
 		NOptEnableEnableEsTextLog(
 			cfg.GetString("scatter.es.write_index"),
 			100, time.Second,
-			elastic.SetURL(cfg.GetString("scatter.es.url")),
+			elastic.SetURL(cfg.GetStringSlice("scatter.es.url")...),
 			elastic.SetSniff(false),
 			//elastic.SetTraceLog(log.New(os.Stderr, "", log.LstdFlags))
 		),
