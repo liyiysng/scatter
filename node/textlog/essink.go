@@ -107,6 +107,6 @@ func (es *esSink) Close() error {
 		es.writeTicker.Stop()
 	}
 	es.flush()
-	es.wg.Done()
+	es.wg.Wait()
 	return nil
 }

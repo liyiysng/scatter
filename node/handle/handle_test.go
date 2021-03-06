@@ -24,22 +24,22 @@ type TestRes struct {
 
 type fooSessionType int
 
-func hookCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {
+func hookCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
 
 	beg := time.Now()
 
-	res, err := caller(req)
+	res, err := callee(req)
 
 	myLog.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
 
 	return err
 }
 
-func notifyCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error {
+func notifyCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {
 
 	beg := time.Now()
 
-	err := caller(req)
+	err := callee(req)
 
 	myLog.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
 
@@ -115,10 +115,10 @@ func TestServiceHandler(t *testing.T) {
 				}
 				return nil
 			},
-			Call: func(session interface{}, srvName string, methodName string, caller func(argValues ...interface{}) error) error {
+			Call: func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error {
 
 				if strings.HasSuffix(methodName, "Args") {
-					return caller(10, int32(1))
+					return callee(10, int32(1))
 				}
 				return errors.New("optional args not support")
 			},

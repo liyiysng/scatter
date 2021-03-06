@@ -77,7 +77,6 @@ func createTemplate(client *elastic.Client, cfg *config.Config) error {
 	tp := client.IndexPutTemplate(name)
 
 	//tp := client.IndexPutIndexTemplate(name)
-
 	tp.BodyJson(cfg.Get("scatter.es.template"))
 
 	tpRes, err := tp.Do(context.Background())

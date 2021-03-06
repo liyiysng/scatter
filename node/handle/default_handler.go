@@ -54,7 +54,7 @@ type service struct {
 // OptionalArgs 可选参数
 type OptionalArgs struct {
 	ArgsTypeValidator func(srvName string, methodName string, argsType []reflect.Type) error
-	Call              func(session interface{}, srvName string, methodName string, caller func(argValues ...interface{}) error) error
+	Call              func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error
 }
 
 // Option handle 选项设置
@@ -66,8 +66,8 @@ type Option struct {
 
 	OptArgs *OptionalArgs
 
-	HookCall   func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error
-	HookNofify func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error
+	HookCall   func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error
+	HookNofify func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error
 }
 
 type serviceHandler struct {
@@ -130,12 +130,12 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 			return nil
 		}
 
-		caller := func(req interface{}) (callRes interface{}, callErr error) {
+		callee := func(req interface{}) (callRes interface{}, callErr error) {
 			// args
 			varArgs := []reflect.Value{svci.recv, argCtx, argSession, reflect.ValueOf(req)}
 			if mtype.hasOptArgs {
 
-				optCaller := func(args ...interface{}) error {
+				optCallee := func(args ...interface{}) error {
 					for i := 0; i < len(args); i++ {
 						varArgs = append(varArgs, reflect.ValueOf(args[i]))
 					}
@@ -143,7 +143,7 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 					return errGetter()
 				}
 
-				callErr = s.OptArgs.Call(session, serviceName, methodName, optCaller)
+				callErr = s.OptArgs.Call(session, serviceName, methodName, optCallee)
 
 				if callErr != nil {
 					return
@@ -167,7 +167,7 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 			return
 		}
 
-		err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), caller)
+		err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
 
 		if err != nil {
 			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s error %v", serviceName, methodName, err)
@@ -222,12 +222,12 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 			return nil
 		}
 
-		caller := func(req interface{}) (callErr error) {
+		callee := func(req interface{}) (callErr error) {
 			// args
 			varArgs := []reflect.Value{svci.recv, argCtx, argSession, reflect.ValueOf(req)}
 			if mtype.hasOptArgs {
 
-				optCaller := func(args ...interface{}) error {
+				optCallee := func(args ...interface{}) error {
 					for i := 0; i < len(args); i++ {
 						varArgs = append(varArgs, reflect.ValueOf(args[i]))
 					}
@@ -235,7 +235,7 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 					return errGetter()
 				}
 
-				callErr = s.OptArgs.Call(session, serviceName, methodName, optCaller)
+				callErr = s.OptArgs.Call(session, serviceName, methodName, optCallee)
 
 				if callErr != nil {
 					return
@@ -251,7 +251,7 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 			return
 		}
 
-		err = s.HookNofify(ctx, session, svci, serviceName, methodName, argReq.Interface(), caller)
+		err = s.HookNofify(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
 
 		if err != nil {
 			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s error %v", serviceName, methodName, err)

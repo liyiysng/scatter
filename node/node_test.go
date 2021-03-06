@@ -3,10 +3,12 @@ package node
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -942,7 +944,7 @@ func TestNodeEsSink(t *testing.T) {
 			100, time.Second,
 			elastic.SetURL(cfg.GetStringSlice("scatter.es.url")...),
 			elastic.SetSniff(false),
-			//elastic.SetTraceLog(log.New(os.Stderr, "", log.LstdFlags))
+			elastic.SetTraceLog(log.New(os.Stderr, "", log.LstdFlags)),
 		),
 	)
 	if err != nil {

@@ -399,11 +399,11 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	s.Handle(n.srvHandle)
 }
 
-func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (res interface{}, err error)) error {
+func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
 
 	beg := time.Now()
 
-	res, err := caller(req)
+	res, err := callee(req)
 
 	if n.opts.showHandleLog {
 		n.opts.Logger.Infof("%s.%s(req:{%v}) (res:{%v},err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
@@ -422,11 +422,11 @@ func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvNa
 	return err
 }
 
-func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, caller func(req interface{}) (err error)) error {
+func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {
 
 	beg := time.Now()
 
-	err := caller(req)
+	err := callee(req)
 
 	if n.opts.showHandleLog {
 		n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
