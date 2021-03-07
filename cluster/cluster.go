@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/json"
 	"net"
 
 	"github.com/liyiysng/scatter/cluster/registry"
@@ -19,26 +20,72 @@ var (
 // GrpcServer grpc服务器
 type GrpcServer struct {
 	*grpc.Server
-	name      string
 	opts      *Options
 	healthSrv *health.Server
 
-	cachedSrv *registry.Cache
+	reg registry.Registry
 }
 
 // Serve 开始服务
 func (s *GrpcServer) Serve(lis net.Listener) error {
 	// 开启健康检测
 	healthgrpc.RegisterHealthServer(s, s.healthSrv)
+	s.healthSrv.SetServingStatus("service_health", healthgrpc.HealthCheckResponse_SERVING)
 	defer s.healthSrv.Shutdown()
 
-	// 开始注册服务
+	// 检测服务
+	watcher, err := s.reg.Watch()
+	if err != nil {
+		return err
+	}
+	defer watcher.Stop()
 
-	return s.Serve(lis)
+	go s.watchSrvs(watcher)
+
+	// 开始注册服务
+	infos := s.GetServiceInfo()
+	for k, v := range infos {
+
+		if !s.opts.registryFillter(k) {
+			continue
+		}
+
+		srv := &registry.Service{
+			Name:    k,
+			Version: "0.0.1",
+			Nodes: []*registry.Node{
+				{
+					ID:      s.opts.id,
+					Address: lis.Addr().String(),
+				},
+			},
+		}
+		// 所有方法
+		for _, m := range v.Methods {
+			srv.Endpoints = append(srv.Endpoints, &registry.Endpoint{
+				Name: m.Name,
+			})
+		}
+
+		s.reg.Register(srv)
+	}
+
+	return s.Server.Serve(lis)
+}
+
+func (s *GrpcServer) watchSrvs(watcher registry.Watcher) {
+	for {
+		res, err := watcher.Next()
+		if err == registry.ErrWatcherStopped {
+			return
+		}
+		buf, _ := json.Marshal(res)
+		myLog.Info(string(buf))
+	}
 }
 
 // NewGrpcServer 创建grpc服务器
-func NewGrpcServer(name string, reg registry.Registry, o ...IOption) *GrpcServer {
+func NewGrpcServer(id string, reg registry.Registry, o ...IOption) *GrpcServer {
 
 	opts := defaultOptions
 
@@ -46,10 +93,12 @@ func NewGrpcServer(name string, reg registry.Registry, o ...IOption) *GrpcServer
 		v.apply(&opts)
 	}
 
+	opts.id = id
+
 	return &GrpcServer{
 		Server:    grpc.NewServer(opts.grpcOpts...),
-		name:      name,
 		opts:      &opts,
+		reg:       reg,
 		healthSrv: health.NewServer(),
 	}
 }

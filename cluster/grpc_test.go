@@ -1,12 +1,15 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/liyiysng/scatter/cluster/cluster_testing"
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/registry/consul"
 	"google.golang.org/grpc"
@@ -14,11 +17,14 @@ import (
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+const (
+	consulAddr = "127.0.0.1:8500"
+)
+
 func TestAddSrv(t *testing.T) {
 
 	const (
-		consulAddr = "127.0.0.1:8500"
-		srvAddr    = "127.0.0.1:1155"
+		srvAddr = "127.0.0.1:1155"
 	)
 
 	wg := sync.WaitGroup{}
@@ -114,4 +120,94 @@ func TestAddSrv(t *testing.T) {
 
 	wg.Wait()
 
+}
+
+type srvStringsImp struct {
+	cluster_testing.UnimplementedSrvStringsServer
+}
+
+func (s *srvStringsImp) ToLower(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
+	return &cluster_testing.String{
+		Str: strings.ToLower(req.Str),
+	}, nil
+}
+func (s *srvStringsImp) ToUpper(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
+	return &cluster_testing.String{
+		Str: strings.ToUpper(req.Str),
+	}, nil
+}
+func (s *srvStringsImp) Split(ctx context.Context, req *cluster_testing.String) (*cluster_testing.StringS, error) {
+	return &cluster_testing.StringS{
+		Strs: strings.Split(req.Str, " "),
+	}, nil
+}
+
+func TestGrpc(t *testing.T) {
+	regCreate := registry.GetRegistry("consul")
+
+	reg := regCreate(
+		registry.Addrs(consulAddr),
+	)
+
+	reg.Init(consul.WithGrpcCheck(time.Second * 2))
+
+	s1 := NewGrpcServer("11010", reg)
+
+	// register to grpc server
+	cluster_testing.RegisterSrvStringsServer(s1, &srvStringsImp{})
+
+	lis, err := net.Listen("tcp", "127.0.0.1:1155")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lis.Close()
+	defer s1.Stop()
+
+	reg2 := regCreate(
+		registry.Addrs(consulAddr),
+	)
+
+	reg2.Init(consul.WithGrpcCheck(time.Second * 2))
+
+	s2 := NewGrpcServer("11011", reg2)
+
+	// register to grpc server
+	cluster_testing.RegisterSrvStringsServer(s2, &srvStringsImp{})
+
+	lis2, err := net.Listen("tcp", "127.0.0.1:1156")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lis2.Close()
+
+	defer s2.Stop()
+
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s1.Serve(lis)
+		if err != nil {
+			myLog.Error(err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s2.Serve(lis2)
+		if err != nil {
+			myLog.Error(err)
+		}
+	}()
+
+	go func() {
+		time.Sleep(time.Second * 10)
+		myLog.Info("close server")
+		lis.Close()
+		lis2.Close()
+	}()
+
+	wg.Wait()
 }

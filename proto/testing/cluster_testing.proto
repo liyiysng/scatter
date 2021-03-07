@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+option go_package = "cluster/cluster_testing";
+
+message String{
+    string str = 1;
+}
+
+message StringS{
+    repeated string strs = 1;
+}
+
+service SrvStrings{
+    rpc ToLower (String) returns (String);
+    rpc ToUpper (String) returns (String);
+    rpc Split (String) returns (StringS);
+}
+
+message Int{
+    int64 i = 1;
+}
+
+message Ints{
+    repeated int64 i = 1;
+}
+
+service SrvInts{
+    rpc Sum (Ints) returns (Int);
+    rpc Multi (Ints) returns (Int);
+}
