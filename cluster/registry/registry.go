@@ -34,33 +34,32 @@ type Registry interface {
 
 // Service 服务
 type Service struct {
-	Name      string      `json:"name"`
-	Version   string      `json:"version"`
-	Endpoints []*Endpoint `json:"endpoints"`
-	Nodes     []*Node     `json:"nodes"`
+	Name      string            `json:"name"`
+	Version   string            `json:"version"`
+	Endpoints []*Endpoint       `json:"endpoints"`
+	Nodes     []*Node           `json:"nodes"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 // Node 节点
 type Node struct {
 	ID       string            `json:"id"`
 	Address  string            `json:"address"`
-	Metadata map[string]string `json:"metadata"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // Endpoint service.method
 type Endpoint struct {
 	Name     string            `json:"name"`
-	Request  *Value            `json:"request"`
-	Response *Value            `json:"response"`
-	Metadata map[string]string `json:"metadata"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-// Value 描述一个值
-type Value struct {
-	Name   string   `json:"name"`
-	Type   string   `json:"type"`
-	Values []*Value `json:"values,omitempty"`
-}
+// // Value 描述一个值
+// type Value struct {
+// 	Name   string   `json:"name"`
+// 	Type   string   `json:"type"`
+// 	Values []*Value `json:"values,omitempty"`
+// }
 
 // Option 初始化选项类型
 type Option func(*Options)

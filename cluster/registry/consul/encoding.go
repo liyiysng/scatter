@@ -5,10 +5,17 @@ import (
 	"compress/zlib"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/liyiysng/scatter/cluster/registry"
+)
+
+const (
+	_endPointPrefix = "_ep_"
+	_nodeMetaPrefix = "_nm_"
+	_srvMetaPrefix  = "_sm_"
+	_srvVersion     = "_version_"
 )
 
 func encode(buf []byte) string {
@@ -45,80 +52,90 @@ func decode(d string) []byte {
 	return rbuf
 }
 
-func encodeEndpoints(endpoints []*registry.Endpoint, needCms bool) string {
-	buf, err := json.Marshal(endpoints)
-	if err != nil {
-		myLog.Errorf("encode endpoints error %v", err)
-		return ""
+// 合并所有元数据
+func encodeMetaData(srv *registry.Service) map[string]string {
+
+	if len(srv.Nodes) != 1 {
+		myLog.Error("encodeMetaData len(srv.Nodes) != 1")
+		return nil
 	}
 
-	if needCms {
-		return encode(buf)
+	meta := make(map[string]string)
+	// endpoints meta
+	for _, v := range srv.Endpoints {
+		if len(v.Metadata) == 0 {
+			continue
+		}
+		buf, err := json.Marshal(v.Metadata)
+		if err != nil {
+			myLog.Errorf("encode metas error %v", err)
+			continue
+		}
+		meta[_endPointPrefix+v.Name] = string(buf)
+	}
+	node := srv.Nodes[0]
+	// node meta
+	for k, v := range node.Metadata {
+		meta[_nodeMetaPrefix+k] = v
+	}
+	// srv meta
+	for k, v := range srv.Metadata {
+		meta[_srvMetaPrefix+k] = v
 	}
 
-	return string(buf)
+	meta[_srvVersion] = srv.Version
+
+	return meta
 }
 
-func encodeMeta(meta map[string]string, needCms bool) string {
-	buf, err := json.Marshal(meta)
-	if err != nil {
-		myLog.Errorf("encode metas error %v", err)
-		return ""
-	}
-
-	if needCms {
-		return encode(buf)
-	}
-
-	return string(buf)
+func decodeVersion(meta map[string]string) string {
+	return meta[_srvVersion]
 }
 
 func decodeEndpoints(meta map[string]string) []*registry.Endpoint {
-	compressed := false
-	if cp, ok := meta["compress"]; ok {
-		fmt.Sscanf(cp, "%v", &compressed)
+
+	eps := make([]*registry.Endpoint, 0)
+
+	for k, v := range meta {
+		if strings.HasPrefix(k, _endPointPrefix) {
+			var eMeta map[string]string
+			err := json.Unmarshal([]byte(v), &eMeta)
+			if err != nil {
+				myLog.Errorf("unmarshal endpoint meta error %v", err)
+				continue
+			}
+			eps = append(eps, &registry.Endpoint{
+				Name:     strings.TrimLeft(k, _endPointPrefix),
+				Metadata: eMeta,
+			})
+		}
 	}
 
-	if ep, ok := meta["endpoints"]; ok {
-		var buf []byte
-		if compressed {
-			buf = decode(ep)
-		} else {
-			buf = []byte(ep)
-		}
-		var endpoints []*registry.Endpoint
-		err := json.Unmarshal(buf, &endpoints)
-		if err != nil {
-			myLog.Errorf("unmarshal endpoints error %v", err)
-			return nil
-		}
-		return endpoints
-	}
-
-	return nil
+	return eps
 }
 
-func decodeMeta(meta map[string]string) map[string]string {
-	compressed := false
-	if cp, ok := meta["compress"]; ok {
-		fmt.Sscanf(cp, "%v", &compressed)
+func decodeNodeMeta(meta map[string]string) map[string]string {
+
+	nMeta := map[string]string{}
+
+	for k, v := range meta {
+		if strings.HasPrefix(k, _nodeMetaPrefix) {
+			nMeta[strings.TrimLeft(k, _nodeMetaPrefix)] = v
+		}
 	}
 
-	if ep, ok := meta["meta"]; ok {
-		var buf []byte
-		if compressed {
-			buf = decode(ep)
-		} else {
-			buf = []byte(ep)
+	return nMeta
+}
+
+func decodeSrvMeta(meta map[string]string) map[string]string {
+
+	sMeta := map[string]string{}
+
+	for k, v := range meta {
+		if strings.HasPrefix(k, _srvMetaPrefix) {
+			sMeta[strings.TrimLeft(k, _srvMetaPrefix)] = v
 		}
-		var nMeta map[string]string
-		err := json.Unmarshal(buf, &nMeta)
-		if err != nil {
-			myLog.Errorf("unmarshal meta error %v", err)
-			return nil
-		}
-		return nMeta
 	}
 
-	return nil
+	return sMeta
 }

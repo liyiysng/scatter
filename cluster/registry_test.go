@@ -41,14 +41,6 @@ func TestRegistyService(t *testing.T) {
 			Endpoints: []*registry.Endpoint{
 				{
 					Name: "Foo1",
-					Request: &registry.Value{
-						Name: "req",
-						Type: "proto.SumReq",
-					},
-					Response: &registry.Value{
-						Name: "res",
-						Type: "proto.SumRes",
-					},
 				},
 			},
 			Nodes: []*registry.Node{
@@ -140,23 +132,18 @@ func TestRegistyMultiService(t *testing.T) {
 			Version: "0.0.1",
 			Endpoints: []*registry.Endpoint{
 				{
-					Name: "Foo1",
-					Request: &registry.Value{
-						Name: "req",
-						Type: "proto.SumReq",
-					},
-					Response: &registry.Value{
-						Name: "res",
-						Type: "proto.SumRes",
-					},
+					Name:     "Foo1",
+					Metadata: map[string]string{"foo": "bar", "fooo": "barr"},
 				},
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:      "110",
-					Address: "127.0.0.1:1155",
+					ID:       "110",
+					Address:  "127.0.0.1:1155",
+					Metadata: map[string]string{"nm": "bar", "nm1": "barr"},
 				},
 			},
+			Metadata: map[string]string{"sm": "bar", "sm1": "barr"},
 		},
 	)
 
@@ -171,14 +158,6 @@ func TestRegistyMultiService(t *testing.T) {
 			Endpoints: []*registry.Endpoint{
 				{
 					Name: "Foo1",
-					Request: &registry.Value{
-						Name: "req",
-						Type: "proto.SumReq",
-					},
-					Response: &registry.Value{
-						Name: "res",
-						Type: "proto.SumRes",
-					},
 				},
 			},
 			Nodes: []*registry.Node{
@@ -202,14 +181,6 @@ func TestRegistyMultiService(t *testing.T) {
 			Endpoints: []*registry.Endpoint{
 				{
 					Name: "Foo1",
-					Request: &registry.Value{
-						Name: "req",
-						Type: "proto.SumReq",
-					},
-					Response: &registry.Value{
-						Name: "res",
-						Type: "proto.SumRes",
-					},
 				},
 			},
 			Nodes: []*registry.Node{
@@ -219,7 +190,6 @@ func TestRegistyMultiService(t *testing.T) {
 				},
 			},
 		},
-		consul.WithRegistryCompress(),
 	)
 
 	if err != nil {

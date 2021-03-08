@@ -89,6 +89,14 @@ func (c *Config) fillDefaultValues() {
 		// 别名(别名为scatters)
 		"scatter.es.template.aliases.scatters": struct{}{},
 		// mappings
+
+		// service setting//////////////////////////////////////////////////////////////////////////////////////////////////////
+		"scatter.service.srvints": &Service{
+			SelectPolicy: "session_affinity",
+			Meta:         map[string]string{"foo": "bar"},
+		},
+		"scatter.service.srvstrings.selectpolicy": "session_affinity",
+		"scatter.service.srvstrings.meta":         map[string]string{"foo": "bar"},
 	}
 
 	for param := range defaultsMap {

@@ -12,6 +12,7 @@ import (
 	"github.com/liyiysng/scatter/cluster/cluster_testing"
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/registry/consul"
+	"github.com/liyiysng/scatter/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -69,14 +70,6 @@ func TestAddSrv(t *testing.T) {
 			Endpoints: []*registry.Endpoint{
 				{
 					Name: "Foo1",
-					Request: &registry.Value{
-						Name: "req",
-						Type: "proto.SumReq",
-					},
-					Response: &registry.Value{
-						Name: "res",
-						Type: "proto.SumRes",
-					},
 				},
 			},
 			Nodes: []*registry.Node{
@@ -182,12 +175,31 @@ func TestGrpc(t *testing.T) {
 
 	defer s2.Stop()
 
+	reg3 := regCreate(
+		registry.Addrs(consulAddr),
+	)
+
+	reg3.Init(consul.WithGrpcCheck(time.Second * 2))
+
+	s3 := NewGrpcServer("11012", reg3)
+
+	// register to grpc server
+	cluster_testing.RegisterSrvStringsServer(s3, &srvStringsImp{})
+
+	lis3, err := net.Listen("tcp", "127.0.0.1:1157")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lis3.Close()
+
+	defer s3.Stop()
+
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s1.Serve(lis)
+		err := s1.Serve(lis, config.NewConfig())
 		if err != nil {
 			myLog.Error(err)
 		}
@@ -196,7 +208,16 @@ func TestGrpc(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s2.Serve(lis2)
+		err := s2.Serve(lis2, config.NewConfig())
+		if err != nil {
+			myLog.Error(err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := s3.Serve(lis3, config.NewConfig())
 		if err != nil {
 			myLog.Error(err)
 		}
@@ -204,10 +225,16 @@ func TestGrpc(t *testing.T) {
 
 	go func() {
 		time.Sleep(time.Second * 10)
-		myLog.Info("close server")
+		myLog.Info("close server 11010")
 		lis.Close()
-		lis2.Close()
 	}()
 
+	// go func() {
+	// 	time.Sleep(time.Second * 50)
+	// 	myLog.Info("close server 11011")
+	// 	lis2.Close()
+	// }()
+
 	wg.Wait()
+	time.Sleep(time.Second * 2)
 }

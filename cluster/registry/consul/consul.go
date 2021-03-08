@@ -240,27 +240,9 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 		}
 	}
 
-	needCompress := false
 	customTags := []string{}
 
-	if options.Context != nil {
-		if ts, ok := options.Context.Value(tagsKey).([]string); ok {
-			customTags = ts
-		}
-		if en, ok := options.Context.Value(compressKey).(bool); ok {
-			needCompress = en
-		}
-	}
-
 	tags := append(customTags, s.Version)
-
-	// matas
-	meta := make(map[string]string)
-
-	meta["compress"] = fmt.Sprintf("%v", needCompress)
-	meta["endpoints"] = encodeEndpoints(s.Endpoints, needCompress)
-	meta["meta"] = encodeMeta(node.Metadata, needCompress)
-	meta["version"] = s.Version
 
 	var check *consul.AgentServiceCheck
 
@@ -301,7 +283,7 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 		ID:      node.ID,
 		Name:    s.Name,
 		Tags:    tags,
-		Meta:    meta,
+		Meta:    encodeMetaData(s),
 		Port:    port,
 		Address: host,
 		Check:   check,
@@ -355,7 +337,7 @@ func (c *consulRegistry) GetService(name string, opts ...registry.GetOption) ([]
 		}
 
 		// version is now a tag
-		version, _ := s.Service.Meta["version"]
+		version := decodeVersion(s.Service.Meta)
 		// service ID is now the node id
 		id := s.Service.ID
 		// key is always the version
@@ -375,6 +357,7 @@ func (c *consulRegistry) GetService(name string, opts ...registry.GetOption) ([]
 				Name:      s.Service.Service,
 				Endpoints: decodeEndpoints(s.Service.Meta),
 				Version:   version,
+				Metadata:  decodeSrvMeta(s.Service.Meta),
 			}
 			serviceMap[key] = svc
 		}
@@ -397,7 +380,7 @@ func (c *consulRegistry) GetService(name string, opts ...registry.GetOption) ([]
 		svc.Nodes = append(svc.Nodes, &registry.Node{
 			ID:       id,
 			Address:  util.HostPort(address, s.Service.Port),
-			Metadata: decodeMeta(s.Service.Meta),
+			Metadata: decodeNodeMeta(s.Service.Meta),
 		})
 	}
 

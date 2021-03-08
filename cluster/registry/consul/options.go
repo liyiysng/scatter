@@ -18,8 +18,7 @@ const (
 	tcpCheckKey     _contextKey = "consul_tcp_check"
 	grpcCheckKey    _contextKey = "consul_grpc_check"
 
-	tagsKey     _contextKey = "consul_reg_tags"
-	compressKey _contextKey = "consul_reg_compress"
+	tagsKey _contextKey = "consul_reg_tags"
 )
 
 // Connect specifies services should be registered as Consul Connect services
@@ -115,15 +114,5 @@ func WithRegistryTags(tags []string) registry.RegisterOption {
 			o.Context = context.Background()
 		}
 		o.Context = context.WithValue(o.Context, tagsKey, tags)
-	}
-}
-
-// WithRegistryCompress 是否压缩
-func WithRegistryCompress() registry.RegisterOption {
-	return func(o *registry.RegisterOptions) {
-		if o.Context == nil {
-			o.Context = context.Background()
-		}
-		o.Context = context.WithValue(o.Context, compressKey, true)
 	}
 }

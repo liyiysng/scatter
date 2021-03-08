@@ -82,6 +82,7 @@ func (cw *consulWatcher) serviceHandler(idx uint64, data interface{}) {
 				Name:      e.Service.Service,
 				Endpoints: decodeEndpoints(e.Service.Meta),
 				Version:   version,
+				Metadata:  decodeSrvMeta(e.Service.Meta),
 			}
 			serviceMap[key] = svc
 		}
@@ -104,7 +105,7 @@ func (cw *consulWatcher) serviceHandler(idx uint64, data interface{}) {
 		svc.Nodes = append(svc.Nodes, &registry.Node{
 			ID:       id,
 			Address:  fmt.Sprintf("%s:%d", address, e.Service.Port),
-			Metadata: decodeMeta(e.Service.Meta),
+			Metadata: decodeNodeMeta(e.Service.Meta),
 		})
 	}
 
