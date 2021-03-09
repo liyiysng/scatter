@@ -5,10 +5,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/liyiysng/scatter/cluster/selector"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -27,8 +27,7 @@ type OnClose func(s Session)
 
 // Session 表示一个客户端,可能是TCP/UDP/ws(s)/http(s)/
 type Session interface {
-	// Stats 获取客户端状态
-	Stats() State
+	selector.ISession
 	// 向客户端推送消息
 	Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 向客户端推送消息
@@ -44,16 +43,12 @@ type Session interface {
 // FrontendSession 前端Session
 type FrontendSession interface {
 	Session
+	// GetNID 节点ID
+	GetNID() int64
+	// PeerAddr 对端地址
+	PeerAddr() string
+	// 消息处理
 	Handle(srvHandler handle.IHandler)
+	// 关闭session
 	Close()
-}
-
-// BackendSession 标识在内部节点session
-// BackendSession 会在各个节点同步Context
-type BackendSession interface {
-	Session
-	// 绑定上下文
-	BindContext(ctx context.Context, key string, data proto.Message) error
-	// 获取上下文
-	GetContext(key string) (exists bool, data proto.Message)
 }

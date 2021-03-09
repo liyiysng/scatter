@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package scatter.cluster;
+
 option go_package = "cluster/cluster_testing";
 
 message String{

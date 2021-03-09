@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -42,7 +43,7 @@ type GrpcServer struct {
 	// remote grpc services
 	remoteSrvs map[string] /*name*/ *grpcService
 	// remote grpc clients
-	clients map[string] /*name*/ map[string] /*version*/ map[string] /*node id*/ grpc.ClientConnInterface
+	clients map[string] /*name*/ map[string] /*node id*/ grpc.ClientConnInterface
 	mu      sync.RWMutex
 }
 
@@ -94,7 +95,7 @@ func (s *GrpcServer) Serve(lis net.Listener, cfg *config.Config) error {
 				selectPolic = svC.SelectPolicy
 			}
 		} else {
-			myLog.Errorf("service config %s not found", srvName)
+			s.opts.logerr.Errorf("service config %s not found", srvName)
 		}
 		srv.Metadata[_selectPolicyKey] = selectPolic
 
@@ -138,8 +139,26 @@ func (s *GrpcServer) watchSrvs(watcher registry.Watcher) {
 			return
 		}
 
-		buf, _ := json.Marshal(res)
-		myLog.Info(string(buf))
+		if len(res.Service.Nodes) == 0 { // 若无节点数据,无需关心
+			continue
+		}
+
+		// filltter
+		nodes := make([]*registry.Node, 0, len(res.Service.Nodes)) // copy remove
+		for _, n := range res.Service.Nodes {
+			// 跳过本节点服务
+			if n.ID == s.opts.id {
+				continue
+			}
+			if !s.opts.watchFillter(res.Service.Name, n) {
+				continue
+			}
+			nodes = append(nodes, n)
+		}
+
+		if len(nodes) == 0 {
+			continue
+		}
 
 		switch res.Action {
 		case "create":
@@ -149,48 +168,88 @@ func (s *GrpcServer) watchSrvs(watcher registry.Watcher) {
 			fallthrough
 		case "update": // create or update
 			{
-				if len(res.Service.Nodes) == 0 { // 若无节点数据,无需关心
-					return
-				}
-
-				// filltter
-				nodes := make([]*registry.Node, 0, len(res.Service.Nodes)) // copy remove
-				for _, n := range res.Service.Nodes {
-					// 跳过本节点服务
-					if n.ID == s.opts.id {
-						continue
-					}
-					if !s.opts.watchFillter(res.Service.Name, n) {
-						continue
-					}
-					nodes = append(nodes, n)
-				}
-
-				// 比对现有服务
-				s.mu.Lock()
-				defer s.mu.Unlock()
-
-				// if srv, ok := s.remoteSrvs[res.Service.Name]; ok { // 服务存在
-
-				// } else { //创建服务,并且添加节点
-				// 	s.remoteSrvs[res.Service.Name] = &grpcService{}
-				// }
+				s.onUpdate(res.Service, nodes)
 			}
 		case "delete":
 			{
+				s.onDelete(res.Service, nodes)
 			}
 		default:
 			{
-				myLog.Errorf("invalid watch action %s", res.Action)
-				return
+				s.opts.logerr.Errorf("invalid watch action %s", res.Action)
+			}
+		}
+	}
+}
+
+func (s *GrpcServer) onUpdate(newSrv *registry.Service, nodes []*registry.Node) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// 比对现有服务
+	if srv, ok := s.remoteSrvs[newSrv.Name]; ok { // 服务存在
+		for _, newNode := range nodes { // 是否有新节点添加
+			found := false
+			for _, oldNode := range srv.srvInfo.Nodes {
+				if oldNode.ID == newNode.ID { // 已存在改节点 , 做更新操作 , 替换元数据
+					oldNode.Metadata = newNode.Metadata
+					found = true
+					break
+				}
+			}
+			if !found { // 有新节点加入
+				s.addNode(newSrv, newNode)
 			}
 		}
 
+	} else { //创建服务,并且添加节点
+		s.addSrv(newSrv)
+		for _, n := range nodes {
+			s.addNode(newSrv, n)
+		}
+	}
+}
+
+func (s *GrpcServer) onDelete(newSrv *registry.Service, nodes []*registry.Node) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, n := range nodes {
+		s.delNode(newSrv, n)
 	}
 }
 
 func (s *GrpcServer) addSrv(srv *registry.Service) {
 
+	gs := &grpcService{
+		srvInfo: &registry.Service{
+			Name:      srv.Name,
+			Version:   srv.Version,
+			Endpoints: srv.Endpoints,
+			Metadata:  srv.Metadata,
+		},
+	}
+
+	s.remoteSrvs[srv.Name] = gs
+	buf, _ := json.Marshal(gs.srvInfo)
+	s.opts.logerr.Infof("find servcie %s", string(buf))
+}
+
+func (s *GrpcServer) addNode(srv *registry.Service, node *registry.Node) {
+	if rs, ok := s.remoteSrvs[srv.Name]; ok {
+		if len(srv.Endpoints) > 0 {
+			rs.srvInfo.Endpoints = srv.Endpoints
+		}
+		if len(srv.Metadata) > 0 {
+			rs.srvInfo.Metadata = srv.Metadata
+		}
+		s.opts.logerr.Infof("find node servcice %s : %v", rs.srvInfo.Name, node)
+		rs.srvInfo.Nodes = append(rs.srvInfo.Nodes, node)
+	} else {
+		s.opts.logerr.Errorf("[GrpcServer.addNode] servers %s not found", srv.Name)
+	}
+}
+
+func (s *GrpcServer) delNode(srv *registry.Service, node *registry.Node) {
+	s.opts.logerr.Infof("delete servcie %s node %v", srv.Name, node)
 }
 
 // NewGrpcServer 创建grpc服务器
@@ -204,12 +263,16 @@ func NewGrpcServer(id string, reg registry.Registry, o ...IOption) *GrpcServer {
 
 	opts.id = id
 
+	if opts.logerr == nil {
+		opts.logerr = logger.NewPrefixLogger(myLog, fmt.Sprintf("node %s:", id))
+	}
+
 	return &GrpcServer{
 		Server:     grpc.NewServer(opts.grpcOpts...),
 		opts:       &opts,
 		reg:        reg,
 		healthSrv:  health.NewServer(),
 		remoteSrvs: make(map[string]*grpcService),
-		clients:    make(map[string] /*name*/ map[string] /*version*/ map[string] /*node id*/ grpc.ClientConnInterface),
+		clients:    make(map[string] /*name*/ map[string] /*node id*/ grpc.ClientConnInterface),
 	}
 }

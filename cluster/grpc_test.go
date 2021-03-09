@@ -1,10 +1,8 @@
 package cluster
 
 import (
-	"context"
 	"encoding/json"
 	"net"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -113,26 +111,6 @@ func TestAddSrv(t *testing.T) {
 
 	wg.Wait()
 
-}
-
-type srvStringsImp struct {
-	cluster_testing.UnimplementedSrvStringsServer
-}
-
-func (s *srvStringsImp) ToLower(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
-	return &cluster_testing.String{
-		Str: strings.ToLower(req.Str),
-	}, nil
-}
-func (s *srvStringsImp) ToUpper(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
-	return &cluster_testing.String{
-		Str: strings.ToUpper(req.Str),
-	}, nil
-}
-func (s *srvStringsImp) Split(ctx context.Context, req *cluster_testing.String) (*cluster_testing.StringS, error) {
-	return &cluster_testing.StringS{
-		Strs: strings.Split(req.Str, " "),
-	}, nil
 }
 
 func TestGrpc(t *testing.T) {

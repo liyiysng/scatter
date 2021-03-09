@@ -375,24 +375,24 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		MaxMsgCacheNum:    3,
 	})
 
-	n.opts.Logger.Infof("new connect %v comming", s.Stats().RemoteAddress)
+	n.opts.Logger.Infof("new connect %v comming", s.PeerAddr())
 
 	n.mu.Lock()
 	if n.sessions == nil { // stoped
 		n.mu.Unlock()
 		return
 	}
-	n.sessions[s.Stats().SID] = s
+	n.sessions[s.GetSID()] = s
 	n.mu.Unlock()
 
 	defer func() {
-		n.opts.Logger.Infof("connect %v leave", s.Stats().RemoteAddress)
+		n.opts.Logger.Infof("connect %v leave", s.PeerAddr())
 		n.mu.Lock()
 		if n.sessions == nil { // stoped
 			n.mu.Unlock()
 			return
 		}
-		delete(n.sessions, s.Stats().SID)
+		delete(n.sessions, s.GetSID())
 		n.mu.Unlock()
 	}()
 

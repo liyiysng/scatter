@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/liyiysng/scatter/cluster/registry"
+	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc"
 )
 
@@ -24,6 +25,9 @@ type Options struct {
 
 	// endpoint metas
 	endpointMetas map[string] /*service name*/ map[string] /*method name*/ map[string]string
+
+	// 日志
+	logerr logger.Logger
 }
 
 var defaultOptions = Options{

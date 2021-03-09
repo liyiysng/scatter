@@ -177,12 +177,16 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession 
 	return ret
 }
 
-func (s *frontendSession) Stats() State {
-	return State{
-		SID:           s.conn.GetSID(),
-		NID:           s.nid,
-		RemoteAddress: s.conn.RemoteAddr().String(),
-	}
+func (s *frontendSession) GetSID() int64 {
+	return s.conn.GetSID()
+}
+
+func (s *frontendSession) GetNID() int64 {
+	return s.nid
+}
+
+func (s *frontendSession) PeerAddr() string {
+	return s.conn.RemoteAddr().String()
 }
 
 func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {

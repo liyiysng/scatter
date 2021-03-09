@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const prefixLogDepth = 2
+const prefixLogDepth = 3
 
 // prefixLogger Logging method on a nil logs without any prefix.
 type prefixLogger struct {
@@ -61,22 +61,22 @@ func (g *prefixLogger) Fatalf(format string, args ...interface{}) {
 }
 
 func (g *prefixLogger) InfoDepth(depth int, args ...interface{}) {
-	args = append(args, g.prefix)
+	args = append([]interface{}{g.prefix}, args)
 	g.logger.InfoDepth(depth+1, fmt.Sprint(args...))
 }
 
 func (g *prefixLogger) WarningDepth(depth int, args ...interface{}) {
-	args = append(args, g.prefix)
+	args = append([]interface{}{g.prefix}, args)
 	g.logger.WarningDepth(depth+1, fmt.Sprint(args...))
 }
 
 func (g *prefixLogger) ErrorDepth(depth int, args ...interface{}) {
-	args = append(args, g.prefix)
+	args = append([]interface{}{g.prefix}, args)
 	g.logger.ErrorDepth(depth+1, fmt.Sprint(args...))
 }
 
 func (g *prefixLogger) FatalDepth(depth int, args ...interface{}) {
-	args = append(args, g.prefix)
+	args = append([]interface{}{g.prefix}, args)
 	g.logger.Fatal(depth+1, fmt.Sprint(args...))
 }
 

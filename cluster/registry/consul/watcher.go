@@ -62,8 +62,8 @@ func (cw *consulWatcher) serviceHandler(idx uint64, data interface{}) {
 
 	for _, e := range entries {
 		serviceName = e.Service.Service
-		// version is now a tag
-		version, _ := e.Service.Meta["version"]
+		// version
+		version := decodeVersion(e.Service.Meta)
 		// service ID is now the node id
 		id := e.Service.ID
 		// key is always the version
