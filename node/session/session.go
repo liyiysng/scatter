@@ -5,7 +5,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/liyiysng/scatter/cluster/selector"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
@@ -25,9 +24,9 @@ type State struct {
 // OnClose 关闭回调类型
 type OnClose func(s Session)
 
-// Session 表示一个客户端,可能是TCP/UDP/ws(s)/http(s)/
+// Session 表示一个客户端,可能是TCP/UDP/ws(s)/http(s) 的一次会话
 type Session interface {
-	selector.ISession
+	GetSID() int64
 	// 向客户端推送消息
 	Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 向客户端推送消息

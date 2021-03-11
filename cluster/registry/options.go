@@ -19,7 +19,8 @@ type Options struct {
 
 // RegisterOptions 注册选项
 type RegisterOptions struct {
-	TTL time.Duration
+	TTL     time.Duration
+	GrpcTTL time.Duration
 	// Other options for implementations of the interface
 	// can be stored in a context
 	Context context.Context
@@ -82,6 +83,13 @@ func TLSConfig(t *tls.Config) Option {
 func RegisterTTL(t time.Duration) RegisterOption {
 	return func(o *RegisterOptions) {
 		o.TTL = t
+	}
+}
+
+// RegisterGrpcTTL grpc ttl
+func RegisterGrpcTTL(t time.Duration) RegisterOption {
+	return func(o *RegisterOptions) {
+		o.GrpcTTL = t
 	}
 }
 

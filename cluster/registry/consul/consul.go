@@ -172,7 +172,7 @@ func (c *consulRegistry) Deregister(s *registry.Service, opts ...registry.Deregi
 	c.Unlock()
 
 	node := s.Nodes[0]
-	return c.Client().Agent().ServiceDeregister(node.ID)
+	return c.Client().Agent().ServiceDeregister(node.SrvNodeID)
 }
 
 func (c *consulRegistry) Register(s *registry.Service, opts ...registry.RegisterOption) error {
@@ -191,13 +191,15 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 		o(&options)
 	}
 
-	if c.opts.Context != nil {
-		if tcpCheckInterval, ok := c.opts.Context.Value(tcpCheckKey).(time.Duration); ok {
-			regTCPCheck = true
-			regInterval = tcpCheckInterval
-		} else if grpcInvterval, ok := c.opts.Context.Value(grpcCheckKey).(time.Duration); ok {
-			regGrpcCheck = true
-			regGrpcInterval = grpcInvterval
+	if options.GrpcTTL > 0 {
+		regGrpcCheck = true
+		regGrpcInterval = options.GrpcTTL
+	} else {
+		if c.opts.Context != nil {
+			if tcpCheckInterval, ok := c.opts.Context.Value(tcpCheckKey).(time.Duration); ok {
+				regTCPCheck = true
+				regInterval = tcpCheckInterval
+			}
 		}
 	}
 
@@ -226,7 +228,7 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 			services, _, err := c.Client().Health().Checks(s.Name, c.queryOptions)
 			if err == nil {
 				for _, v := range services {
-					if v.ServiceID == node.ID {
+					if v.ServiceID == node.SrvNodeID {
 						return nil
 					}
 				}
@@ -234,7 +236,7 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 		} else {
 			// if the err is nil we're all good, bail out
 			// if not, we don't know what the state is, so full re-register
-			if err := c.Client().Agent().PassTTL("service:"+node.ID, ""); err == nil {
+			if err := c.Client().Agent().PassTTL("service:"+node.SrvNodeID, ""); err == nil {
 				return nil
 			}
 		}
@@ -280,7 +282,7 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 
 	// register the service
 	asr := &consul.AgentServiceRegistration{
-		ID:      node.ID,
+		ID:      node.SrvNodeID,
 		Name:    s.Name,
 		Tags:    tags,
 		Meta:    encodeMetaData(s),
@@ -312,7 +314,7 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 	}
 
 	// pass the healthcheck
-	return c.Client().Agent().PassTTL("service:"+node.ID, "")
+	return c.Client().Agent().PassTTL("service:"+node.SrvNodeID, "")
 }
 
 func (c *consulRegistry) GetService(name string, opts ...registry.GetOption) ([]*registry.Service, error) {
@@ -378,9 +380,9 @@ func (c *consulRegistry) GetService(name string, opts ...registry.GetOption) ([]
 		}
 
 		svc.Nodes = append(svc.Nodes, &registry.Node{
-			ID:       id,
-			Address:  util.HostPort(address, s.Service.Port),
-			Metadata: decodeNodeMeta(s.Service.Meta),
+			SrvNodeID: id,
+			Address:   util.HostPort(address, s.Service.Port),
+			Metadata:  decodeNodeMeta(s.Service.Meta),
 		})
 	}
 

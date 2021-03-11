@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package scatter.cluster;
+package scatter.service;
 
 option go_package = "cluster/cluster_testing";
 

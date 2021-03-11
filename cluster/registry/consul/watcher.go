@@ -2,8 +2,6 @@ package consul
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"sync"
 
 	"github.com/hashicorp/consul/api"
@@ -45,7 +43,7 @@ func newConsulWatcher(cr *consulRegistry, opts ...registry.WatchOption) (registr
 	}
 
 	wp.Handler = cw.handle
-	go wp.RunWithClientAndLogger(cr.Client(), log.New(os.Stderr, "", log.LstdFlags))
+	go wp.RunWithClientAndHclog(cr.Client(), nil)
 	cw.wp = wp
 
 	return cw, nil
@@ -103,9 +101,9 @@ func (cw *consulWatcher) serviceHandler(idx uint64, data interface{}) {
 		}
 
 		svc.Nodes = append(svc.Nodes, &registry.Node{
-			ID:       id,
-			Address:  fmt.Sprintf("%s:%d", address, e.Service.Port),
-			Metadata: decodeNodeMeta(e.Service.Meta),
+			SrvNodeID: id,
+			Address:   fmt.Sprintf("%s:%d", address, e.Service.Port),
+			Metadata:  decodeNodeMeta(e.Service.Meta),
 		})
 	}
 
@@ -150,7 +148,7 @@ func (cw *consulWatcher) serviceHandler(idx uint64, data interface{}) {
 			for _, oldNode := range oldService.Nodes {
 				var seen bool
 				for _, newNode := range newService.Nodes {
-					if newNode.ID == oldNode.ID {
+					if newNode.SrvNodeID == oldNode.SrvNodeID {
 						seen = true
 						break
 					}
@@ -210,7 +208,7 @@ func (cw *consulWatcher) handle(idx uint64, data interface{}) {
 		})
 		if err == nil {
 			wp.Handler = cw.serviceHandler
-			go wp.RunWithClientAndLogger(cw.r.Client(), log.New(os.Stderr, "", log.LstdFlags))
+			go wp.RunWithClientAndHclog(cw.r.Client(), nil)
 			cw.watchers[service] = wp
 			cw.next <- &registry.Result{Action: "create", Service: &registry.Service{Name: service}}
 		}

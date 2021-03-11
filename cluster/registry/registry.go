@@ -43,9 +43,9 @@ type Service struct {
 
 // Node 节点
 type Node struct {
-	ID       string            `json:"id"`
-	Address  string            `json:"address"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	SrvNodeID string            `json:"srv_node_id"` // serviceName/nodeID
+	Address   string            `json:"address"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 // Endpoint service.method
@@ -94,7 +94,7 @@ func addNodes(old, neu []*Node) []*Node {
 		// check against new nodes
 		for _, n := range nodes {
 			// ids match then skip
-			if o.ID == n.ID {
+			if o.SrvNodeID == n.SrvNodeID {
 				exists = true
 				break
 			}
@@ -115,7 +115,7 @@ func delNodes(old, del []*Node) []*Node {
 	for _, o := range old {
 		var rem bool
 		for _, n := range del {
-			if o.ID == n.ID {
+			if o.SrvNodeID == n.SrvNodeID {
 				rem = true
 				break
 			}

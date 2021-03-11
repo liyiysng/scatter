@@ -90,13 +90,23 @@ func (c *Config) fillDefaultValues() {
 		"scatter.es.template.aliases.scatters": struct{}{},
 		// mappings
 
-		// service setting//////////////////////////////////////////////////////////////////////////////////////////////////////
+		// register settings//////////////////////////////////////////////////////////////////////////////////////////////
+		"scatter.register.grpc_check_interval": "5s",     // 健康检查
+		"scatter.register.default":             "consul", //默认服务注册/发现
+		// consul settings
+		"scatter.register.consul.addrs":   []string{"127.0.0.1:8500"},
+		"scatter.register.consul.timeout": "0",
+
+		// service setting////////////////////////////////////////////////////////////////////////////////////////////////
 		"scatter.service.srvints": &Service{
 			SelectPolicy: "session_affinity",
 			Meta:         map[string]string{"foo": "bar"},
 		},
 		"scatter.service.srvstrings.selectpolicy": "session_affinity",
 		"scatter.service.srvstrings.meta":         map[string]string{"foo": "bar"},
+
+		// grpc node settings///////////////////////////////////////////////////////////////////////////////////////////
+		"scatter.gnode.dial.timeout": "10s", // 链接超时
 	}
 
 	for param := range defaultsMap {

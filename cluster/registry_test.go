@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +11,11 @@ import (
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/registry/consul"
 	_ "github.com/liyiysng/scatter/cluster/registry/consul"
+	"github.com/liyiysng/scatter/cluster/registry/publisher"
 	"github.com/liyiysng/scatter/util"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestRegistyService(t *testing.T) {
@@ -45,8 +50,8 @@ func TestRegistyService(t *testing.T) {
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:      "110",
-					Address: "127.0.0.1:1155",
+					SrvNodeID: "110",
+					Address:   "127.0.0.1:1155",
 				},
 			},
 		},
@@ -138,9 +143,9 @@ func TestRegistyMultiService(t *testing.T) {
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:       "110",
-					Address:  "127.0.0.1:1155",
-					Metadata: map[string]string{"nm": "bar", "nm1": "barr"},
+					SrvNodeID: "110",
+					Address:   "127.0.0.1:1155",
+					Metadata:  map[string]string{"nm": "bar", "nm1": "barr"},
 				},
 			},
 			Metadata: map[string]string{"sm": "bar", "sm1": "barr"},
@@ -162,8 +167,8 @@ func TestRegistyMultiService(t *testing.T) {
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:      "220",
-					Address: "127.0.0.1:1154",
+					SrvNodeID: "220",
+					Address:   "127.0.0.1:1154",
 				},
 			},
 		},
@@ -185,8 +190,8 @@ func TestRegistyMultiService(t *testing.T) {
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:      "330",
-					Address: "127.0.0.1:1158",
+					SrvNodeID: "330",
+					Address:   "127.0.0.1:1158",
 				},
 			},
 		},
@@ -197,5 +202,80 @@ func TestRegistyMultiService(t *testing.T) {
 	}
 
 	time.Sleep(time.Second * 2)
+
+}
+
+var (
+	grpcAddr = []string{"127.0.0.1:5544", "127.0.0.1:5533"}
+)
+
+func TestRegistrySingleton(t *testing.T) {
+
+	s := grpc.NewServer()
+
+	lis, err := net.Listen("tcp", grpcAddr[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lis.Close()
+
+	hs := health.NewServer()
+	healthgrpc.RegisterHealthServer(s, hs)
+
+	go func() {
+		defer s.Stop()
+		err := s.Serve(lis)
+		if err != nil {
+			myLog.Error(err)
+		}
+	}()
+
+	registry.Register(&registry.Service{
+		Name:    "singleton_test_1",
+		Version: "0.0.2",
+		Nodes: []*registry.Node{
+			{
+				SrvNodeID: "330",
+				Address:   grpcAddr[0],
+			},
+		},
+	}, registry.RegisterGrpcTTL(time.Second*5))
+
+	// registry.Register(&registry.Service{
+	// 	Name:    "singleton_test_2",
+	// 	Version: "0.0.2",
+	// 	Nodes: []*registry.Node{
+	// 		{
+	// 			ID:      "330",
+	// 			Address: grpcAddr[0],
+	// 		},
+	// 	},
+	// }, registry.RegisterGrpcTTL(time.Second*5))
+
+	go func() {
+		chanRes := publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool {
+			return true
+		})
+		for {
+			_, cok := <-chanRes
+			if !cok {
+				return
+			}
+			allNode := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
+				return true
+			})
+			myLog.Info("--------------current nodes-------------------------------------")
+			for _, v := range allNode {
+				myLog.Info(v)
+			}
+			myLog.Info("----------end of current nodes-----------------------------------\n")
+		}
+	}()
+
+	time.Sleep(time.Second * 50)
+
+	lis.Close()
+
+	time.Sleep(time.Second * 20)
 
 }

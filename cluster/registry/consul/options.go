@@ -16,7 +16,6 @@ const (
 	allowStaleKey   _contextKey = "consul_allow_stale"
 	queryOptionsKey _contextKey = "consul_query_options"
 	tcpCheckKey     _contextKey = "consul_tcp_check"
-	grpcCheckKey    _contextKey = "consul_grpc_check"
 
 	tagsKey _contextKey = "consul_reg_tags"
 )
@@ -91,19 +90,6 @@ func TCPCheck(t time.Duration) registry.Option {
 			o.Context = context.Background()
 		}
 		o.Context = context.WithValue(o.Context, tcpCheckKey, t)
-	}
-}
-
-// WithGrpcCheck 使用grpc健康检查
-func WithGrpcCheck(t time.Duration) registry.Option {
-	return func(o *registry.Options) {
-		if t <= time.Duration(0) {
-			return
-		}
-		if o.Context == nil {
-			o.Context = context.Background()
-		}
-		o.Context = context.WithValue(o.Context, grpcCheckKey, t)
 	}
 }
 

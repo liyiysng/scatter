@@ -20,6 +20,8 @@ var (
 	srvAddr = []string{"127.0.0.1:5544", "127.0.0.1:5533"}
 )
 
+type _ctxType string
+
 //////////////////////////////////////////////////////resover////////////////////////////////////////////////////////////////////////////
 type resolverBuilderTest struct {
 }
@@ -28,8 +30,17 @@ func (d *resolverBuilderTest) Build(target resolver.Target, cc resolver.ClientCo
 
 	myLog.Info("build target ", target)
 	cc.UpdateState(resolver.State{
-		Addresses: []resolver.Address{{Addr: srvAddr[0]}, {Addr: srvAddr[1]}},
+		Addresses: []resolver.Address{{Addr: srvAddr[0]}},
 	})
+	go func() {
+		for {
+			time.Sleep(time.Second * 5)
+			cc.UpdateState(resolver.State{
+				Addresses: []resolver.Address{{Addr: srvAddr[1]}},
+			})
+		}
+	}()
+
 	return &resolverTest{
 		cc: cc,
 	}, nil
@@ -51,10 +62,11 @@ func (r *resolverTest) ResolveNow(options resolver.ResolveNowOptions) {
 	myLog.Info("[resolverTest.ResolveNow]")
 }
 
-//////////////////////////////////////////////////////resover////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////balancer////////////////////////////////////////////////////////////////////////////
 
 // newBuilder creates a new roundrobin balancer builder.
 func newBuilder() balancer.Builder {
+	myLog.Info("[newBuilder]")
 	return base.NewBalancerBuilder("scatter", &pickerBuilderTest{}, base.Config{HealthCheck: false})
 }
 
@@ -90,12 +102,22 @@ type pickerTest struct {
 
 func (p *pickerTest) Pick(info balancer.PickInfo) (res balancer.PickResult, err error) {
 
-	myLog.Infof("[pickerTest.Pick] %v", info)
+	myLog.Infof("[pickerTest.Pick] %v", info.FullMethodName)
 
-	p.mu.Lock()
-	sc := p.subConns[p.next]
-	p.next = (p.next + 1) % len(p.subConns)
-	p.mu.Unlock()
+	targetConn, ok := info.Ctx.Value(_ctxType("test")).(balancer.SubConn)
+
+	var sc balancer.SubConn
+
+	if !ok {
+		p.mu.Lock()
+		sc = p.subConns[p.next]
+		p.next = (p.next + 1) % len(p.subConns)
+		p.mu.Unlock()
+	} else {
+		myLog.Infof("call cached %v", targetConn)
+		sc = targetConn
+	}
+
 	return balancer.PickResult{SubConn: sc}, nil
 }
 
@@ -106,11 +128,13 @@ type srvStringsImp struct {
 }
 
 func (s *srvStringsImp) ToLower(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
+	myLog.Infof("[srvStringsImp.ToLower] call id %s", s.id)
 	return &cluster_testing.String{
 		Str: strings.ToLower(req.Str),
 	}, nil
 }
 func (s *srvStringsImp) ToUpper(ctx context.Context, req *cluster_testing.String) (*cluster_testing.String, error) {
+	myLog.Infof("[srvStringsImp.ToUpper] call id %s", s.id)
 	return &cluster_testing.String{
 		Str: strings.ToUpper(req.Str),
 	}, nil
@@ -124,9 +148,11 @@ func (s *srvStringsImp) Split(ctx context.Context, req *cluster_testing.String) 
 
 type srvIntsImp struct {
 	cluster_testing.UnimplementedSrvIntsServer
+	id string
 }
 
 func (s *srvIntsImp) Sum(ctx context.Context, req *cluster_testing.Ints) (*cluster_testing.Int, error) {
+	myLog.Infof("[srvIntsImp.Sum] call id %s", s.id)
 	sum := int64(0)
 	for _, v := range req.I {
 		sum += v
@@ -168,8 +194,8 @@ func TestGrpcBlancer(t *testing.T) {
 
 	cluster_testing.RegisterSrvStringsServer(s1, &srvStringsImp{id: "1"})
 	cluster_testing.RegisterSrvStringsServer(s2, &srvStringsImp{id: "2"})
-	cluster_testing.RegisterSrvIntsServer(s1, &srvIntsImp{})
-	cluster_testing.RegisterSrvIntsServer(s2, &srvIntsImp{})
+	cluster_testing.RegisterSrvIntsServer(s1, &srvIntsImp{id: "1"})
+	cluster_testing.RegisterSrvIntsServer(s2, &srvIntsImp{id: "2"})
 
 	wg := sync.WaitGroup{}
 
@@ -205,17 +231,37 @@ func TestGrpcBlancer(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	client2, err := grpc.Dial("scatter://auth/math", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(
+		`{
+			"loadBalancingConfig":[ { "scatter": {} } ]
+		}
+		`,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	stringsClient := cluster_testing.NewSrvStringsClient(client)
+	intsClient := cluster_testing.NewSrvIntsClient(client2)
 
 	go func() {
 		time.Sleep(time.Second * 10)
 		lis1.Close()
 	}()
 
-	for i := 0; i < 50; i++ {
+	ctx := context.Background()
+
+	for i := 0; i < 20; i++ {
 		time.Sleep(time.Second)
-		_, err := stringsClient.Split(context.Background(), &cluster_testing.String{
+		_, err := stringsClient.Split(ctx, &cluster_testing.String{
 			Str: "hello world",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = intsClient.Sum(context.Background(), &cluster_testing.Ints{
+			I: []int64{4, 3, 6},
 		})
 		if err != nil {
 			t.Fatal(err)

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -27,38 +28,26 @@ const (
 	_selectPolicyKey = "select_policy"
 )
 
-type grpcService struct {
-	srvInfo  *registry.Service
-	selector selector.Selector
+func getServiceNodeID(nodeID, srvName string) string {
+	return fmt.Sprintf("%s/%s", nodeID, srvName)
 }
 
-// GrpcServer grpc服务器
-type GrpcServer struct {
+// GrpcNode grpc服务器
+type GrpcNode struct {
 	*grpc.Server
 	opts      *Options
 	healthSrv *health.Server
 
-	reg registry.Registry
-
-	// remote grpc services
-	remoteSrvs map[string] /*name*/ *grpcService
-	// remote grpc clients
-	clients map[string] /*name*/ map[string] /*node id*/ grpc.ClientConnInterface
-	mu      sync.RWMutex
+	clientMu sync.Mutex
+	clients  map[string] /*srvice name*/ grpc.ClientConnInterface
 }
 
 // Serve 开始服务
-func (s *GrpcServer) Serve(lis net.Listener, cfg *config.Config) error {
+func (s *GrpcNode) Serve(lis net.Listener) error {
 	// 开启健康检测
 	healthgrpc.RegisterHealthServer(s, s.healthSrv)
 	s.healthSrv.SetServingStatus("service_health", healthgrpc.HealthCheckResponse_SERVING)
 	defer s.healthSrv.Shutdown()
-
-	srvCfg := make(map[string]*config.Service)
-	err := cfg.UnmarshalKey("scatter.service", &srvCfg)
-	if err != nil {
-		return err
-	}
 
 	// 开始注册服务
 	infos := s.GetServiceInfo()
@@ -74,28 +63,31 @@ func (s *GrpcServer) Serve(lis net.Listener, cfg *config.Config) error {
 			Version: "0.0.1",
 			Nodes: []*registry.Node{
 				{
-					ID:       s.opts.id,
-					Address:  lis.Addr().String(),
-					Metadata: s.opts.nodeMeta,
+					SrvNodeID: getServiceNodeID(s.opts.id, k),
+					Address:   lis.Addr().String(),
+					Metadata:  s.opts.nodeMeta,
 				},
 			},
 			Metadata: map[string]string{},
 		}
 
 		// 设置服务元数据 和 选择策略
-		selectPolic := selector.DefaultPolicy
 		srvName := strings.ToLower(k)
-		if svC, ok := srvCfg[srvName]; ok {
+		var srvCfg *config.Service
+		err := s.opts.cfg.UnmarshalKey(srvName, &srvCfg)
+		if err != nil {
+			return err
+		}
+		selectPolic := selector.DefaultPolicy
+		if srvCfg != nil {
 			// copy
-			for ksc, vsc := range svC.Meta {
+			for ksc, vsc := range srvCfg.Meta {
 				srv.Metadata[ksc] = vsc
 			}
 			// 设置选择策略
-			if svC.SelectPolicy != "" {
-				selectPolic = svC.SelectPolicy
+			if srvCfg.SelectPolicy != "" {
+				selectPolic = srvCfg.SelectPolicy
 			}
-		} else {
-			s.opts.logerr.Errorf("service config %s not found", srvName)
 		}
 		srv.Metadata[_selectPolicyKey] = selectPolic
 
@@ -114,146 +106,84 @@ func (s *GrpcServer) Serve(lis net.Listener, cfg *config.Config) error {
 			}
 		}
 
-		err := s.reg.Register(srv)
+		if s.opts.reg != nil {
+			err = s.opts.reg.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+		} else {
+			err = registry.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+		}
 		if err != nil {
 			return err
 		}
+		buf, _ := json.Marshal(srv)
+		s.opts.logerr.Infof("register service success : %s ", string(buf))
 	}
-
-	// 检测服务
-	watcher, err := s.reg.Watch()
-	if err != nil {
-		return err
-	}
-	defer watcher.Stop()
-
-	go s.watchSrvs(watcher)
 
 	return s.Server.Serve(lis)
 }
 
-func (s *GrpcServer) watchSrvs(watcher registry.Watcher) {
-	for {
-		res, err := watcher.Next()
-		if err == registry.ErrWatcherStopped {
-			return
-		}
+// GetClient 获取grpc客户端链接
+func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err error) {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
 
-		if len(res.Service.Nodes) == 0 { // 若无节点数据,无需关心
-			continue
-		}
-
-		// filltter
-		nodes := make([]*registry.Node, 0, len(res.Service.Nodes)) // copy remove
-		for _, n := range res.Service.Nodes {
-			// 跳过本节点服务
-			if n.ID == s.opts.id {
-				continue
-			}
-			if !s.opts.watchFillter(res.Service.Name, n) {
-				continue
-			}
-			nodes = append(nodes, n)
-		}
-
-		if len(nodes) == 0 {
-			continue
-		}
-
-		switch res.Action {
-		case "create":
-			//1.{"Action":"create","Service":{"name":"SrvStrings","version":"","endpoints":null,"nodes":null}}
-			//2.{"Action":"create","Service":{"name":"SrvStrings","version":"0.0.1","endpoints":[{"name":"ToLower"},{"name":"ToUpper"},{"name":"Split"}],"nodes":null}}
-			//3.{"Action":"update","Service":{"name":"SrvStrings","version":"0.0.1","endpoints":[{"name":"ToLower"},{"name":"ToUpper"},{"name":"Split"}],"nodes":[{"id":"11010","address":"127.0.0.1:1155"}]}}
-			fallthrough
-		case "update": // create or update
-			{
-				s.onUpdate(res.Service, nodes)
-			}
-		case "delete":
-			{
-				s.onDelete(res.Service, nodes)
-			}
-		default:
-			{
-				s.opts.logerr.Errorf("invalid watch action %s", res.Action)
-			}
-		}
-	}
-}
-
-func (s *GrpcServer) onUpdate(newSrv *registry.Service, nodes []*registry.Node) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// 比对现有服务
-	if srv, ok := s.remoteSrvs[newSrv.Name]; ok { // 服务存在
-		for _, newNode := range nodes { // 是否有新节点添加
-			found := false
-			for _, oldNode := range srv.srvInfo.Nodes {
-				if oldNode.ID == newNode.ID { // 已存在改节点 , 做更新操作 , 替换元数据
-					oldNode.Metadata = newNode.Metadata
-					found = true
-					break
-				}
-			}
-			if !found { // 有新节点加入
-				s.addNode(newSrv, newNode)
-			}
-		}
-
-	} else { //创建服务,并且添加节点
-		s.addSrv(newSrv)
-		for _, n := range nodes {
-			s.addNode(newSrv, n)
-		}
-	}
-}
-
-func (s *GrpcServer) onDelete(newSrv *registry.Service, nodes []*registry.Node) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, n := range nodes {
-		s.delNode(newSrv, n)
-	}
-}
-
-func (s *GrpcServer) addSrv(srv *registry.Service) {
-
-	gs := &grpcService{
-		srvInfo: &registry.Service{
-			Name:      srv.Name,
-			Version:   srv.Version,
-			Endpoints: srv.Endpoints,
-			Metadata:  srv.Metadata,
-		},
+	if gc, ok := s.clients[srvName]; ok {
+		return gc, nil
 	}
 
-	s.remoteSrvs[srv.Name] = gs
-	buf, _ := json.Marshal(gs.srvInfo)
-	s.opts.logerr.Infof("find servcie %s", string(buf))
-}
+	// 创建链接并保存
+	ctx := context.Background()
+	dialOpts := []grpc.DialOption{}
 
-func (s *GrpcServer) addNode(srv *registry.Service, node *registry.Node) {
-	if rs, ok := s.remoteSrvs[srv.Name]; ok {
-		if len(srv.Endpoints) > 0 {
-			rs.srvInfo.Endpoints = srv.Endpoints
-		}
-		if len(srv.Metadata) > 0 {
-			rs.srvInfo.Metadata = srv.Metadata
-		}
-		s.opts.logerr.Infof("find node servcice %s : %v", rs.srvInfo.Name, node)
-		rs.srvInfo.Nodes = append(rs.srvInfo.Nodes, node)
-	} else {
-		s.opts.logerr.Errorf("[GrpcServer.addNode] servers %s not found", srv.Name)
+	dialOpts = append(dialOpts, grpc.WithInsecure())
+
+	// 超时设置
+	timeout := s.opts.cfg.GetDuration("scatter.gnode.dial.timeout")
+	if timeout > 0 {
+		dialOpts = append(dialOpts, grpc.WithBlock())
+		// In the non-blocking case, the ctx does not act against the connection. It
+		// only controls the setup steps.
+		c, cancel := context.WithTimeout(ctx, timeout)
+		ctx = c
+		defer cancel()
 	}
+
+	// 服务配置
+	var srvCfg *config.Service
+	err = s.opts.cfg.UnmarshalKey(strings.ToLower(srvName), &srvCfg)
+	if err != nil {
+		return nil, err
+	}
+	policy := selector.DefaultPolicy
+	if srvCfg != nil {
+		if srvCfg.SelectPolicy != "" {
+			policy = srvCfg.SelectPolicy
+		}
+	}
+	myLog.Infof("cfg %v , srvName %s policy %s", srvCfg, strings.ToLower(srvName), policy)
+	strCfg := fmt.Sprintf(
+		`
+		{
+			"loadBalancingConfig":[ { "%s": {} } ]
+		}`,
+		policy)
+	dialOpts = append(dialOpts, grpc.WithDefaultServiceConfig(strCfg))
+
+	c, err = grpc.DialContext(
+		ctx,
+		fmt.Sprintf("scatter://%s/%s", s.opts.id, srvName),
+		dialOpts...,
+	)
+	if err != nil {
+		return
+	}
+
+	s.clients[srvName] = c
+
+	return
 }
 
-func (s *GrpcServer) delNode(srv *registry.Service, node *registry.Node) {
-	s.opts.logerr.Infof("delete servcie %s node %v", srv.Name, node)
-}
-
-// NewGrpcServer 创建grpc服务器
-func NewGrpcServer(id string, reg registry.Registry, o ...IOption) *GrpcServer {
+// NewGrpcNode 创建grpc节点
+func NewGrpcNode(id string, o ...IOption) *GrpcNode {
 
 	opts := defaultOptions
 
@@ -263,16 +193,18 @@ func NewGrpcServer(id string, reg registry.Registry, o ...IOption) *GrpcServer {
 
 	opts.id = id
 
+	if opts.cfg == nil { // use global config
+		opts.cfg = config.GetConfig()
+	}
+
 	if opts.logerr == nil {
 		opts.logerr = logger.NewPrefixLogger(myLog, fmt.Sprintf("node %s:", id))
 	}
 
-	return &GrpcServer{
-		Server:     grpc.NewServer(opts.grpcOpts...),
-		opts:       &opts,
-		reg:        reg,
-		healthSrv:  health.NewServer(),
-		remoteSrvs: make(map[string]*grpcService),
-		clients:    make(map[string] /*name*/ map[string] /*node id*/ grpc.ClientConnInterface),
+	return &GrpcNode{
+		Server:    grpc.NewServer(opts.grpcOpts...),
+		opts:      &opts,
+		healthSrv: health.NewServer(),
+		clients:   make(map[string]grpc.ClientConnInterface),
 	}
 }

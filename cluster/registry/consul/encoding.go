@@ -105,7 +105,7 @@ func decodeEndpoints(meta map[string]string) []*registry.Endpoint {
 				continue
 			}
 			eps = append(eps, &registry.Endpoint{
-				Name:     strings.TrimLeft(k, _endPointPrefix),
+				Name:     strings.TrimPrefix(k, _endPointPrefix),
 				Metadata: eMeta,
 			})
 		}
@@ -120,7 +120,7 @@ func decodeNodeMeta(meta map[string]string) map[string]string {
 
 	for k, v := range meta {
 		if strings.HasPrefix(k, _nodeMetaPrefix) {
-			nMeta[strings.TrimLeft(k, _nodeMetaPrefix)] = v
+			nMeta[strings.TrimPrefix(k, _nodeMetaPrefix)] = v
 		}
 	}
 
@@ -133,7 +133,7 @@ func decodeSrvMeta(meta map[string]string) map[string]string {
 
 	for k, v := range meta {
 		if strings.HasPrefix(k, _srvMetaPrefix) {
-			sMeta[strings.TrimLeft(k, _srvMetaPrefix)] = v
+			sMeta[strings.TrimPrefix(k, _srvMetaPrefix)] = v
 		}
 	}
 

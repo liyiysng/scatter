@@ -32,7 +32,7 @@ func NewSrvStringsClient(cc grpc.ClientConnInterface) SrvStringsClient {
 
 func (c *srvStringsClient) ToLower(ctx context.Context, in *String, opts ...grpc.CallOption) (*String, error) {
 	out := new(String)
-	err := c.cc.Invoke(ctx, "/scatter.cluster.SrvStrings/ToLower", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/scatter.service.SrvStrings/ToLower", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (c *srvStringsClient) ToLower(ctx context.Context, in *String, opts ...grpc
 
 func (c *srvStringsClient) ToUpper(ctx context.Context, in *String, opts ...grpc.CallOption) (*String, error) {
 	out := new(String)
-	err := c.cc.Invoke(ctx, "/scatter.cluster.SrvStrings/ToUpper", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/scatter.service.SrvStrings/ToUpper", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (c *srvStringsClient) ToUpper(ctx context.Context, in *String, opts ...grpc
 
 func (c *srvStringsClient) Split(ctx context.Context, in *String, opts ...grpc.CallOption) (*StringS, error) {
 	out := new(StringS)
-	err := c.cc.Invoke(ctx, "/scatter.cluster.SrvStrings/Split", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/scatter.service.SrvStrings/Split", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func _SrvStrings_ToLower_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/scatter.cluster.SrvStrings/ToLower",
+		FullMethod: "/scatter.service.SrvStrings/ToLower",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SrvStringsServer).ToLower(ctx, req.(*String))
@@ -121,7 +121,7 @@ func _SrvStrings_ToUpper_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/scatter.cluster.SrvStrings/ToUpper",
+		FullMethod: "/scatter.service.SrvStrings/ToUpper",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SrvStringsServer).ToUpper(ctx, req.(*String))
@@ -139,7 +139,7 @@ func _SrvStrings_Split_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/scatter.cluster.SrvStrings/Split",
+		FullMethod: "/scatter.service.SrvStrings/Split",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SrvStringsServer).Split(ctx, req.(*String))
@@ -148,7 +148,7 @@ func _SrvStrings_Split_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 var _SrvStrings_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "scatter.cluster.SrvStrings",
+	ServiceName: "scatter.service.SrvStrings",
 	HandlerType: (*SrvStringsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -186,7 +186,7 @@ func NewSrvIntsClient(cc grpc.ClientConnInterface) SrvIntsClient {
 
 func (c *srvIntsClient) Sum(ctx context.Context, in *Ints, opts ...grpc.CallOption) (*Int, error) {
 	out := new(Int)
-	err := c.cc.Invoke(ctx, "/scatter.cluster.SrvInts/Sum", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/scatter.service.SrvInts/Sum", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (c *srvIntsClient) Sum(ctx context.Context, in *Ints, opts ...grpc.CallOpti
 
 func (c *srvIntsClient) Multi(ctx context.Context, in *Ints, opts ...grpc.CallOption) (*Int, error) {
 	out := new(Int)
-	err := c.cc.Invoke(ctx, "/scatter.cluster.SrvInts/Multi", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/scatter.service.SrvInts/Multi", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func _SrvInts_Sum_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/scatter.cluster.SrvInts/Sum",
+		FullMethod: "/scatter.service.SrvInts/Sum",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SrvIntsServer).Sum(ctx, req.(*Ints))
@@ -262,7 +262,7 @@ func _SrvInts_Multi_Handler(srv interface{}, ctx context.Context, dec func(inter
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/scatter.cluster.SrvInts/Multi",
+		FullMethod: "/scatter.service.SrvInts/Multi",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SrvIntsServer).Multi(ctx, req.(*Ints))
@@ -271,7 +271,7 @@ func _SrvInts_Multi_Handler(srv interface{}, ctx context.Context, dec func(inter
 }
 
 var _SrvInts_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "scatter.cluster.SrvInts",
+	ServiceName: "scatter.service.SrvInts",
 	HandlerType: (*SrvIntsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

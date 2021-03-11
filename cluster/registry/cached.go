@@ -243,7 +243,7 @@ func (c *cache) update(res *Result) {
 		for _, cur := range service.Nodes {
 			var seen bool
 			for _, node := range res.Service.Nodes {
-				if cur.ID == node.ID {
+				if cur.SrvNodeID == node.SrvNodeID {
 					seen = true
 					break
 				}
@@ -266,7 +266,7 @@ func (c *cache) update(res *Result) {
 		for _, cur := range service.Nodes {
 			var seen bool
 			for _, del := range res.Service.Nodes {
-				if del.ID == cur.ID {
+				if del.SrvNodeID == cur.SrvNodeID {
 					seen = true
 					break
 				}

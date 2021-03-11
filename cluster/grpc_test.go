@@ -9,8 +9,6 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/cluster_testing"
 	"github.com/liyiysng/scatter/cluster/registry"
-	"github.com/liyiysng/scatter/cluster/registry/consul"
-	"github.com/liyiysng/scatter/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -59,8 +57,6 @@ func TestAddSrv(t *testing.T) {
 		registry.Addrs(consulAddr),
 	)
 
-	reg.Init(consul.WithGrpcCheck(time.Second * 2))
-
 	err = reg.Register(
 		&registry.Service{
 			Name:    "reg_test",
@@ -72,8 +68,8 @@ func TestAddSrv(t *testing.T) {
 			},
 			Nodes: []*registry.Node{
 				{
-					ID:      "110",
-					Address: srvAddr,
+					SrvNodeID: "110",
+					Address:   srvAddr,
 				},
 			},
 		},
@@ -120,9 +116,7 @@ func TestGrpc(t *testing.T) {
 		registry.Addrs(consulAddr),
 	)
 
-	reg.Init(consul.WithGrpcCheck(time.Second * 2))
-
-	s1 := NewGrpcServer("11010", reg)
+	s1 := NewGrpcNode("11010", OptWithRegistry(reg))
 
 	// register to grpc server
 	cluster_testing.RegisterSrvStringsServer(s1, &srvStringsImp{})
@@ -138,9 +132,7 @@ func TestGrpc(t *testing.T) {
 		registry.Addrs(consulAddr),
 	)
 
-	reg2.Init(consul.WithGrpcCheck(time.Second * 2))
-
-	s2 := NewGrpcServer("11011", reg2)
+	s2 := NewGrpcNode("11011", OptWithRegistry(reg2))
 
 	// register to grpc server
 	cluster_testing.RegisterSrvStringsServer(s2, &srvStringsImp{})
@@ -157,9 +149,7 @@ func TestGrpc(t *testing.T) {
 		registry.Addrs(consulAddr),
 	)
 
-	reg3.Init(consul.WithGrpcCheck(time.Second * 2))
-
-	s3 := NewGrpcServer("11012", reg3)
+	s3 := NewGrpcNode("11012", OptWithRegistry(reg3))
 
 	// register to grpc server
 	cluster_testing.RegisterSrvStringsServer(s3, &srvStringsImp{})
@@ -177,7 +167,7 @@ func TestGrpc(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := s1.Serve(lis, config.NewConfig())
+		err := s1.Serve(lis)
 		if err != nil {
 			myLog.Error(err)
 		}
@@ -186,7 +176,7 @@ func TestGrpc(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := s2.Serve(lis2, config.NewConfig())
+		err := s2.Serve(lis2)
 		if err != nil {
 			myLog.Error(err)
 		}
@@ -195,7 +185,7 @@ func TestGrpc(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := s3.Serve(lis3, config.NewConfig())
+		err := s3.Serve(lis3)
 		if err != nil {
 			myLog.Error(err)
 		}
