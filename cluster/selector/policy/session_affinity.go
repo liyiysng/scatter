@@ -2,19 +2,12 @@ package policy
 
 import (
 	"context"
-	"errors"
 	"math/rand"
+	"strings"
 	"sync/atomic"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
-)
-
-var (
-	// ErrorSessionFuncNotFount session未绑定
-	ErrorSessionFuncNotFount = errors.New("session bind function not found")
-	// ErrorServerUnvaliable 服务器不可用
-	ErrorServerUnvaliable = errors.New("server unabliable")
 )
 
 type _sessionAffinityKeyType string
@@ -24,6 +17,10 @@ const (
 	_sessionAffinityBindKey _sessionAffinityKeyType = "_sessionAffinityBindKey"
 	_sessionAffinityGetKey  _sessionAffinityKeyType = "_sessionAffinityGetKey"
 )
+
+type sessionAffinityBindData struct {
+	srvSessions map[string] /*srvName*/ balancer.SubConn
+}
 
 // ConnBindFunc 绑定链接
 type ConnBindFunc func(conn interface{})
@@ -68,42 +65,63 @@ type sessionAffinityPicker struct {
 	subConns map[balancer.SubConn]base.SubConnInfo
 	arrConns []balancer.SubConn
 	next     int64
+	srvName  string
 }
 
 func (p *sessionAffinityPicker) Pick(info balancer.PickInfo) (res balancer.PickResult, err error) {
 
 	myLog.Infof("[sessionAffinityPicker.Pick] %v", info.FullMethodName)
 
-	getTargetConn, ok := info.Ctx.Value(_sessionAffinityGetKey).(ConnGetFunc)
+	// 服务名可以从builder获取,但balancer.SubConn未提供相关数据
+	// base.SubConnInfo 在该版本中只提供了地址[IP]信息,未/不能 提供相关attribute和meta数据(meta和attribute不同 会导致重复链接)
+	// TODO grpc.balancer修复后 , 修改相关实现
+	if p.srvName == "" {
+		v := strings.Split(info.FullMethodName, "/")
+		if len(v) != 3 {
+			return balancer.PickResult{}, ErrorServiceFormatError
+		}
+		p.srvName = v[1]
+	}
 
-	var targetConn balancer.SubConn
+	getFunc, ok := info.Ctx.Value(_sessionAffinityGetKey).(ConnGetFunc)
 
-	if ok { // 已经存在
-		conn := getTargetConn()
+	if ok {
+		bindObj := getFunc()
 
-		if conn == nil { // 第一次调用 , 选择一个节点并绑定
-			myLog.Infof("%s fist pick , bind conn", info.FullMethodName)
-			// 选择一个
-			index := atomic.AddInt64(&p.next, 1) % int64(len(p.arrConns))
-			targetConn = p.arrConns[index]
+		var bindData *sessionAffinityBindData
+
+		if bindObj == nil { // 绑定数据
+			bindData = &sessionAffinityBindData{
+				srvSessions: make(map[string]balancer.SubConn),
+			}
 			// 绑定
 			if bindFunc, bindOK := info.Ctx.Value(_sessionAffinityBindKey).(ConnBindFunc); bindOK {
-				bindFunc(targetConn)
+				bindFunc(bindData)
 			} else {
 				return balancer.PickResult{}, ErrorSessionFuncNotFount
 			}
-		} else { // 链接已经存在
-			myLog.Infof("%s pick conn in ctx", info.FullMethodName)
-			// 验证状态是否正确
-			targetConn = conn.(balancer.SubConn)
-			if _, stateOK := p.subConns[targetConn]; !stateOK {
-				return balancer.PickResult{}, ErrorServerUnvaliable
-			}
+		} else {
+			bindData = bindObj.(*sessionAffinityBindData)
 		}
 
-	} else {
-		return balancer.PickResult{}, ErrorSessionFuncNotFount
+		subConn, ok := bindData.srvSessions[p.srvName]
+		if !ok { // 选择一个节点
+			index := atomic.AddInt64(&p.next, 1) % int64(len(p.arrConns))
+			subConn = p.arrConns[index]
+			bindData.srvSessions[p.srvName] = subConn
+			return balancer.PickResult{SubConn: subConn}, nil
+		}
+		// 验证状态是否正确
+		if _, stateOK := p.subConns[subConn]; !stateOK {
+			return balancer.PickResult{}, ErrorServerUnvaliable
+		}
+
+		myLog.Infof("pick %s ", info.FullMethodName)
+
+		return balancer.PickResult{SubConn: subConn}, nil
+
 	}
 
-	return balancer.PickResult{SubConn: targetConn}, nil
+	// session 中未提供bind的context
+	return balancer.PickResult{}, ErrorSessionFuncNotFount
 }

@@ -140,15 +140,15 @@ func TestGrpcNodeClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n3, err := createGrpcNode(&wg, "102", "127.0.0.1:1466")
+	n3, err := createGrpcNode(&wg, "102", "127.0.0.1:1469")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	go func() {
-		time.Sleep(time.Second * 10)
-		n2.Stop()
-	}()
+	// go func() {
+	// 	time.Sleep(time.Second * 10)
+	// 	n2.Stop()
+	// }()
 
 	ctx := context.Background()
 
@@ -160,12 +160,22 @@ func TestGrpcNodeClient(t *testing.T) {
 		return connBind
 	})
 
+	ctx = policy.WithConsistentHashID(ctx, "88576")
+
+	myLog.Info("---------------------------------begin dial----------------------------------")
+
 	client, err := n1.GetClient("scatter.service.SrvStrings")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	iClient, err := n1.GetClient("scatter.service.SrvInts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	stringsClient := cluster_testing.NewSrvStringsClient(client)
+	intsClient := cluster_testing.NewSrvIntsClient(iClient)
 
 	for i := 0; i < 50; i++ {
 		res, err := stringsClient.ToUpper(ctx, &cluster_testing.String{
@@ -176,6 +186,14 @@ func TestGrpcNodeClient(t *testing.T) {
 		}
 		t.Log(res)
 		time.Sleep(time.Second * 1)
+
+		sres, err := intsClient.Sum(ctx, &cluster_testing.Ints{
+			I: []int64{10, 32, 55},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(sres)
 	}
 
 	time.Sleep(time.Second * 10)

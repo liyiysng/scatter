@@ -28,10 +28,6 @@ const (
 	_selectPolicyKey = "select_policy"
 )
 
-func getServiceNodeID(nodeID, srvName string) string {
-	return fmt.Sprintf("%s/%s", nodeID, srvName)
-}
-
 // GrpcNode grpc服务器
 type GrpcNode struct {
 	*grpc.Server
@@ -39,32 +35,73 @@ type GrpcNode struct {
 	healthSrv *health.Server
 
 	clientMu sync.Mutex
-	clients  map[string] /*srvice name*/ grpc.ClientConnInterface
+	clients  map[string] /*srvice name*/ *grpc.ClientConn
 }
 
 // Serve 开始服务
 func (s *GrpcNode) Serve(lis net.Listener) error {
+
 	// 开启健康检测
 	healthgrpc.RegisterHealthServer(s, s.healthSrv)
 	s.healthSrv.SetServingStatus("service_health", healthgrpc.HealthCheckResponse_SERVING)
 	defer s.healthSrv.Shutdown()
 
 	// 开始注册服务
-	infos := s.GetServiceInfo()
-	for k, v := range infos {
+	srvNeedRegister, err := s.getSrvNeedRegister(lis.Addr().String())
+	if err != nil {
+		return err
+	}
 
+	// 注册服务
+	for _, srv := range srvNeedRegister {
+		var err error
+		if s.opts.reg != nil {
+			err = s.opts.reg.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+		} else {
+			err = registry.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+		}
+		if err != nil {
+			return err
+		}
+		buf, _ := json.Marshal(srv)
+		s.opts.logerr.Infof("register service success : %s ", string(buf))
+	}
+
+	defer func() {
+		// 取消注册
+		for _, srv := range srvNeedRegister {
+			var err error = nil
+			if s.opts.reg != nil {
+				err = s.opts.reg.Deregister(srv)
+			} else {
+				err = registry.Deregister(srv)
+			}
+			if err != nil {
+				s.opts.logerr.Errorf("[GrpcNode.Serve] dereigster error %v", err)
+			}
+		}
+		// 关闭所有grpc Conn
+		s.closeAllClients()
+	}()
+
+	return s.Server.Serve(lis)
+}
+
+func (s *GrpcNode) getSrvNeedRegister(addr string) ([]*registry.Service, error) {
+	infos := s.GetServiceInfo()
+	srvNeedRegister := make([]*registry.Service, 0, len(infos))
+	for k, v := range infos {
 		if !s.opts.registryFillter(k) {
 			continue
 		}
-
 		// 初始信息
 		srv := &registry.Service{
 			Name:    k,
 			Version: "0.0.1",
 			Nodes: []*registry.Node{
 				{
-					SrvNodeID: getServiceNodeID(s.opts.id, k),
-					Address:   lis.Addr().String(),
+					SrvNodeID: selector.GetServiceID(s.opts.id, k),
+					Address:   addr,
 					Metadata:  s.opts.nodeMeta,
 				},
 			},
@@ -76,7 +113,7 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 		var srvCfg *config.Service
 		err := s.opts.cfg.UnmarshalKey(srvName, &srvCfg)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		selectPolic := selector.DefaultPolicy
 		if srvCfg != nil {
@@ -106,19 +143,22 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 			}
 		}
 
-		if s.opts.reg != nil {
-			err = s.opts.reg.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
-		} else {
-			err = registry.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
-		}
-		if err != nil {
-			return err
-		}
-		buf, _ := json.Marshal(srv)
-		s.opts.logerr.Infof("register service success : %s ", string(buf))
+		srvNeedRegister = append(srvNeedRegister, srv)
 	}
+	return srvNeedRegister, nil
+}
 
-	return s.Server.Serve(lis)
+func (s *GrpcNode) closeAllClients() {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+
+	for _, v := range s.clients {
+		err := v.Close()
+		if err != nil {
+			s.opts.logerr.Warningf("[GrpcNode.closeAllClients] close client %v", err)
+		}
+	}
+	s.clients = make(map[string]*grpc.ClientConn)
 }
 
 // GetClient 获取grpc客户端链接
@@ -159,7 +199,7 @@ func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err er
 			policy = srvCfg.SelectPolicy
 		}
 	}
-	myLog.Infof("cfg %v , srvName %s policy %s", srvCfg, strings.ToLower(srvName), policy)
+	myLog.Infof("cfg %v , srvName[%s] use policy [%s]", srvCfg, strings.ToLower(srvName), policy)
 	strCfg := fmt.Sprintf(
 		`
 		{
@@ -168,7 +208,7 @@ func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err er
 		policy)
 	dialOpts = append(dialOpts, grpc.WithDefaultServiceConfig(strCfg))
 
-	c, err = grpc.DialContext(
+	conn, err := grpc.DialContext(
 		ctx,
 		fmt.Sprintf("scatter://%s/%s", s.opts.id, srvName),
 		dialOpts...,
@@ -177,9 +217,9 @@ func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err er
 		return
 	}
 
-	s.clients[srvName] = c
+	s.clients[srvName] = conn
 
-	return
+	return conn, nil
 }
 
 // NewGrpcNode 创建grpc节点
@@ -205,6 +245,6 @@ func NewGrpcNode(id string, o ...IOption) *GrpcNode {
 		Server:    grpc.NewServer(opts.grpcOpts...),
 		opts:      &opts,
 		healthSrv: health.NewServer(),
-		clients:   make(map[string]grpc.ClientConnInterface),
+		clients:   make(map[string]*grpc.ClientConn),
 	}
 }

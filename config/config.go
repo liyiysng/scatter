@@ -102,7 +102,7 @@ func (c *Config) fillDefaultValues() {
 			SelectPolicy: "session_affinity",
 			Meta:         map[string]string{"foo": "bar"},
 		},
-		"scatter.service.srvstrings.selectpolicy": "session_affinity",
+		"scatter.service.srvstrings.selectpolicy": "consistent_hash",
 		"scatter.service.srvstrings.meta":         map[string]string{"foo": "bar"},
 
 		// grpc node settings///////////////////////////////////////////////////////////////////////////////////////////

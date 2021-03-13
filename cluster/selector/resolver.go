@@ -1,6 +1,7 @@
 package selector
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/liyiysng/scatter/cluster/registry"
@@ -11,6 +12,20 @@ import (
 func init() {
 	// 注册解析
 	resolver.Register(&discoverResolverBuilder{})
+}
+
+// GetServiceID 获取serviceID
+func GetServiceID(nodeID string, srvName string) string {
+	return fmt.Sprintf("%s/%s", nodeID, srvName)
+}
+
+// GetServiceNameAndNodeID 根据 service ID 获取service name 和 nodeID
+func GetServiceNameAndNodeID(srvID string) (nodeID string, srvName string, err error) {
+	srvAndID := strings.Split(srvID, "/")
+	if len(srvAndID) != 2 {
+		return "", "", fmt.Errorf("invalid format service id %s", srvID)
+	}
+	return srvAndID[0], srvAndID[1], nil
 }
 
 type discoverResolverBuilder struct {
@@ -29,14 +44,10 @@ func (d *discoverResolverBuilder) Build(target resolver.Target, cc resolver.Clie
 	ret := &discoverResolver{
 		cc: cc,
 		sub: publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool {
-			srvAndID := strings.Split(node.SrvNodeID, "/")
-			if len(srvAndID) != 2 {
-				myLog.Errorf("srvNodeID errror %s", node.SrvNodeID)
-				return srvName == serviceName
-			}
-			return srvAndID[0] != nodeID && srvName == serviceName
+			return srvName == serviceName // 所有该服务的节点
 		}),
-		nodeID: nodeID,
+		nodeID:  nodeID,
+		srvName: serviceName,
 	}
 
 	ret.run()
@@ -50,19 +61,15 @@ func (d *discoverResolverBuilder) Scheme() string {
 }
 
 type discoverResolver struct {
-	cc     resolver.ClientConn
-	sub    chan interface{}
-	nodeID string
+	cc      resolver.ClientConn
+	sub     chan interface{}
+	nodeID  string
+	srvName string
 }
 
 func (r *discoverResolver) updateCC() {
 	nodes := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
-		srvAndID := strings.Split(node.SrvNodeID, "/")
-		if len(srvAndID) != 2 {
-			myLog.Errorf("srvNodeID errror %s", node.SrvNodeID)
-			return true
-		}
-		return srvAndID[0] != r.nodeID && srvAndID[1] == srv.Name // 除去本节点之外的所有节点
+		return r.srvName == srv.Name // 所有该服务的节点
 	})
 
 	addrs := []resolver.Address{}
