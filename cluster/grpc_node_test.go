@@ -145,10 +145,10 @@ func TestGrpcNodeClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// go func() {
-	// 	time.Sleep(time.Second * 10)
-	// 	n2.Stop()
-	// }()
+	go func() {
+		time.Sleep(time.Second * 10)
+		n2.Stop()
+	}()
 
 	ctx := context.Background()
 

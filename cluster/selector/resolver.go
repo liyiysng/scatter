@@ -6,6 +6,7 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/registry/publisher"
+	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -38,7 +39,6 @@ func (d *discoverResolverBuilder) Build(target resolver.Target, cc resolver.Clie
 
 	myLog.Info("[discoverResolverBuilder.Build] build target ", target)
 
-	nodeID := target.Authority
 	serviceName := target.Endpoint
 
 	ret := &discoverResolver{
@@ -46,7 +46,6 @@ func (d *discoverResolverBuilder) Build(target resolver.Target, cc resolver.Clie
 		sub: publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool {
 			return srvName == serviceName // 所有该服务的节点
 		}),
-		nodeID:  nodeID,
 		srvName: serviceName,
 	}
 
@@ -63,7 +62,6 @@ func (d *discoverResolverBuilder) Scheme() string {
 type discoverResolver struct {
 	cc      resolver.ClientConn
 	sub     chan interface{}
-	nodeID  string
 	srvName string
 }
 
@@ -75,8 +73,14 @@ func (r *discoverResolver) updateCC() {
 	addrs := []resolver.Address{}
 
 	for _, n := range nodes {
+		nid, _, err := GetServiceNameAndNodeID(n.SrvNodeID)
+		if err != nil {
+			myLog.Error(err)
+			continue
+		}
 		addrs = append(addrs, resolver.Address{
-			Addr: n.Address,
+			Addr:       n.Address,
+			Attributes: attributes.New("serviceID", n.SrvNodeID, "srvName", r.srvName, "nodeID", nid, "meta", n.Metadata),
 		})
 	}
 

@@ -2,11 +2,11 @@ package policy
 
 import (
 	"context"
-	"strings"
 
+	"github.com/liyiysng/scatter/cluster/selector/policy/common"
+	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/util/hash"
 	"google.golang.org/grpc/balancer"
-	"google.golang.org/grpc/balancer/base"
 )
 
 type _consistentHashKeyType string
@@ -22,33 +22,58 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 	return ctx
 }
 
+var defaultConsistentHashBuilder = &consistentHashBuilder{
+	srvConsistent: map[string]*hash.Consistent{},
+}
+
 func newConsistentHashBuilder() balancer.Builder {
-	return base.NewBalancerBuilder(_consistentHashName, &consistentHashBuilder{}, base.Config{HealthCheck: false})
+	return common.NewBalancerBuilder(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false})
 }
 
 type consistentHashBuilder struct {
+	srvConsistent map[string] /*service name*/ *hash.Consistent
 }
 
-func (b *consistentHashBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Picker {
 
-	myLog.Info("[consistentHashBuilder.Build]", info)
+	if myLog.V(logger.VIMPORTENT) {
+		myLog.Infof("[consistentHashBuilder.Build] %v ", info)
+	}
 
-	if len(info.ReadySCs) == 0 {
-		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
+	if myLog.V(logger.VDEBUG) {
+		myLog.Info("[consistentHashBuilder.Build]--------------------------------------")
+		for _, v := range info.ReadySCs {
+			myLog.Infof("[consistentHashBuilder.Build] service_id[%s] srvName[%s] nodeID[%s] %p",
+				v.Address.Attributes.Value("serviceID"),
+				v.Address.Attributes.Value("srvName"),
+				v.Address.Attributes.Value("nodeID"),
+				b)
+		}
+		myLog.Info("[consistentHashBuilder.Build]--------------------------------------")
 	}
 
 	consistent := hash.New()
 	subConns := map[string]balancer.SubConn{}
 
 	for k, v := range info.ReadySCs {
-		myLog.Info(v.Address.Addr)
-		subConns[v.Address.Addr] = k
-		consistent.Add(v.Address.Addr)
+		if v.Address.Attributes == nil {
+			myLog.Errorf("[consistentHashBuilder.Build] attributes not fount")
+			continue
+		}
+		srvID := v.Address.Attributes.Value("serviceID")
+		if srvID == nil {
+			myLog.Errorf("[consistentHashBuilder.Build] attributes serviceID not fount")
+			continue
+		}
+		strSrvID := srvID.(string)
+		subConns[strSrvID] = k
+		consistent.Add(strSrvID)
 	}
 
 	return &consistentHashPicker{
-		subConns:   subConns,
+		srvName:    info.Target.Endpoint,
 		consistent: consistent,
+		subConns:   subConns,
 	}
 }
 
@@ -60,17 +85,8 @@ type consistentHashPicker struct {
 
 func (p *consistentHashPicker) Pick(info balancer.PickInfo) (res balancer.PickResult, err error) {
 
-	myLog.Infof("[consistentHashPicker.Pick] %v", info.FullMethodName)
-
-	// 服务名可以从builder获取,但balancer.SubConn未提供相关数据
-	// base.SubConnInfo 在该版本中只提供了地址[IP]信息,未/不能 提供相关attribute和meta数据(meta和attribute不同 会导致重复链接)
-	// TODO grpc.balancer修复后 , 修改相关实现
-	if p.srvName == "" {
-		v := strings.Split(info.FullMethodName, "/")
-		if len(v) != 3 {
-			return balancer.PickResult{}, ErrorServiceFormatError
-		}
-		p.srvName = v[1]
+	if myLog.V(logger.VTRACE) {
+		myLog.Infof("[consistentHashPicker.Pick] %v", info.FullMethodName)
 	}
 
 	id := info.Ctx.Value(_consistentHashBindKey)

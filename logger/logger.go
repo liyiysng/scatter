@@ -5,6 +5,20 @@ import (
 	"os"
 )
 
+// SCATTER_GO_LOG_VERBOSITY_LEVEL
+const (
+	// VALL 显示所有
+	VALL = 4
+	// VTRACE 显示跟踪
+	VTRACE = 3
+	// VDEBUG 显示DEBUG
+	VDEBUG = 2
+	// VIMPORTENT 关键信息
+	VIMPORTENT = 1
+	// SYS 系统信息
+	VSYS = 0
+)
+
 // GLogger is the logger used for the non-depth log functions.
 var GLogger Logger
 

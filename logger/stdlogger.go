@@ -68,7 +68,7 @@ func newLogger() Logger {
 	warningW := ioutil.Discard
 	infoW := ioutil.Discard
 
-	logLevel := os.Getenv("NODE_GO_LOG_SEVERITY_LEVEL")
+	logLevel := os.Getenv("SCATTER_GO_LOG_SEVERITY_LEVEL")
 
 	logLevel = "INFO"
 
@@ -82,9 +82,11 @@ func newLogger() Logger {
 	}
 
 	var v int
-	vLevel := os.Getenv("NODE_GO_LOG_VERBOSITY_LEVEL")
+	vLevel := os.Getenv("SCATTER_GO_LOG_VERBOSITY_LEVEL")
 	if vl, err := strconv.Atoi(vLevel); err == nil {
 		v = vl
+	} else {
+		v = VALL
 	}
 	return NewLoggerWithVerbosity(infoW, warningW, errorW, v)
 }

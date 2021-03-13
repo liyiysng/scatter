@@ -25,6 +25,7 @@ var (
 )
 
 func init() {
+	// 注册 session_affinity
 	balancer.Register(newSessionAffinityBuilder())
 	balancer.Register(newConsistentHashBuilder())
 }

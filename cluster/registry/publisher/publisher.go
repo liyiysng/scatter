@@ -219,7 +219,9 @@ func (s *Publisher) addNode(srv *registry.Service, node *registry.Node) {
 
 func (s *Publisher) delNode(srv *registry.Service, node *registry.Node) {
 
-	myLog.Info("[Publisher.delNode] %v", node)
+	if myLog.V(logger.VDEBUG) {
+		myLog.Infof("[Publisher.delNode] %v", node)
+	}
 
 	if rs, ok := s.srvs[srv.Name]; ok {
 		found := false

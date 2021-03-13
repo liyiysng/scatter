@@ -99,7 +99,7 @@ func (c *Config) fillDefaultValues() {
 
 		// service setting////////////////////////////////////////////////////////////////////////////////////////////////
 		"scatter.service.srvints": &Service{
-			SelectPolicy: "session_affinity",
+			SelectPolicy: "consistent_hash",
 			Meta:         map[string]string{"foo": "bar"},
 		},
 		"scatter.service.srvstrings.selectpolicy": "consistent_hash",

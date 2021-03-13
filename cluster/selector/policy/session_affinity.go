@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
@@ -44,7 +45,9 @@ type sessionAffinityBuilder struct {
 
 func (b *sessionAffinityBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 
-	myLog.Info("[sessionAffinityBuilder.Build]", info)
+	if myLog.V(logger.VIMPORTENT) {
+		myLog.Info("[sessionAffinityBuilder.Build]", info)
+	}
 
 	if len(info.ReadySCs) == 0 {
 		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
@@ -70,7 +73,9 @@ type sessionAffinityPicker struct {
 
 func (p *sessionAffinityPicker) Pick(info balancer.PickInfo) (res balancer.PickResult, err error) {
 
-	myLog.Infof("[sessionAffinityPicker.Pick] %v", info.FullMethodName)
+	if myLog.V(logger.VTRACE) {
+		myLog.Infof("[sessionAffinityPicker.Pick] %v", info.FullMethodName)
+	}
 
 	// 服务名可以从builder获取,但balancer.SubConn未提供相关数据
 	// base.SubConnInfo 在该版本中只提供了地址[IP]信息,未/不能 提供相关attribute和meta数据(meta和attribute不同 会导致重复链接)
@@ -116,7 +121,9 @@ func (p *sessionAffinityPicker) Pick(info balancer.PickInfo) (res balancer.PickR
 			return balancer.PickResult{}, ErrorServerUnvaliable
 		}
 
-		myLog.Infof("pick %s ", info.FullMethodName)
+		if myLog.V(logger.VTRACE) {
+			myLog.Infof("pick %s ", info.FullMethodName)
+		}
 
 		return balancer.PickResult{SubConn: subConn}, nil
 
