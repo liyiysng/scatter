@@ -46,14 +46,13 @@ func (w *WSAcceptor) hasTLSCertificates() bool {
 // ListenAndServe listens and serve in the specified addr
 func (w *WSAcceptor) ListenAndServe() error {
 
+	defer w.Stop()
+	defer close(w.connChan)
+
 	listener, err := net.Listen("tcp", w.opt.Addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen: %s", err.Error())
 	}
-	w.listener = listener
-
-	defer w.Stop()
-	defer close(w.connChan)
 
 	w.listener = listener
 
@@ -74,11 +73,14 @@ func (w *WSAcceptor) Stop() {
 			}
 		}
 		w.closed = true
-		w.opt.Logger.Info("stop ws listen: %s", w.opt.Addr)
+		w.opt.Logger.Infof("stop ws listen: %s", w.opt.Addr)
 	})
 }
 
 func (w *WSAcceptor) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+
+	// mux := http.NewServeMux()
+	// mux.ServeHTTP(rw, r)
 
 	conn, err := conn.NewWSConn(rw, r, w.opt.GetConnOpt())
 	if err != nil {

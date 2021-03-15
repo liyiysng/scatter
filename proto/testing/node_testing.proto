@@ -11,3 +11,66 @@ message SumReq{
 message SumRes{
     int64 Sum = 1;
 }
+
+message FooReq{
+	string req = 1;
+}
+
+message FooRes{
+	string res = 1;
+	uint64 playerUID = 2;
+	uint64 playerUIDs = 3;
+}
+
+message FooPush{
+	string push = 1;
+}
+
+message FooNotiry{
+	string notify = 1;
+}
+
+
+// push
+// 系统公告通知
+message SystemNoticePush
+{
+	string content = 1;// 公告内容
+}
+
+//notify
+message ChatNotify
+{
+	int64 toUID = 1; // 对方UID
+	string content = 2;//聊天内容
+}
+
+message DataSegment_1{
+	int64 UID = 1;
+	string strContent = 2;
+}
+
+message DataSegment_2{
+	int64 UID = 1;
+	string strContent = 2;
+}
+
+message DynamicSegment_1 {
+	int32 id = 1;
+	string str = 2;
+	bool b = 3;
+}
+
+message DynamicSegment_2 {
+	int32 id = 1;
+	string str = 2;
+	double d = 3;
+}
+
+
+message DataTest{
+	DataSegment_1 segment_1 = 1;
+	DataSegment_2 segment_2 = 2;
+	repeated DynamicSegment_1 ds_1 = 3;
+	repeated DynamicSegment_2 ds_2 = 4;
+}

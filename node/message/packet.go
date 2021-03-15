@@ -3,6 +3,7 @@ package message
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"io/ioutil"
 	"sync"
@@ -115,7 +116,6 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 			return n, err
 		}
 		if p.PacketOpt&COMPRESS > 0 { // 解压
-
 			r, err := compressor.Decompress(bytes.NewBuffer(buf))
 			if err != nil {
 				return n, err
@@ -128,6 +128,7 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 		p.Data = buf
 	} else {
 		p.Data = nil
+		err = errors.New("read empty message")
 	}
 	return
 }
@@ -174,6 +175,7 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 		return
 	}
 	n += 4
+
 	if lenghtToWrite > 0 {
 		written, err := w.Write(bufToWrite)
 		if err != nil {

@@ -15,6 +15,7 @@ import (
 	"github.com/liyiysng/scatter/node/conn"
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
+	phead "github.com/liyiysng/scatter/node/message/proto"
 	"github.com/liyiysng/scatter/ratelimit"
 	"github.com/liyiysng/scatter/util"
 )
@@ -446,7 +447,7 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 				}
 
 				// 若收到握手数据
-				if mctx.msgRead.GetMsgType() == message.HANDSHAKE {
+				if mctx.msgRead.GetMsgType() == phead.MsgType_HANDSHAKE {
 					checkConnectTimeout.Stop()
 				}
 
@@ -498,7 +499,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 
 	// 处理读取的消息
 	switch mctx.msgRead.GetMsgType() {
-	case message.NOTIFY:
+	case phead.MsgType_NOTIFY:
 		{
 			err := s.handleNotify(mctx, srvHandler)
 			if err != nil {
@@ -506,7 +507,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			}
 			s.finishMsg(mctx, nil)
 		}
-	case message.REQUEST:
+	case phead.MsgType_REQUEST:
 		{
 			sequence := mctx.msgRead.GetSequence()
 			srv := mctx.msgRead.GetService()
@@ -524,6 +525,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 					if err != nil {
 						return err
 					}
+					return customErr
 				}
 				return err
 			}
@@ -538,7 +540,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 				return err
 			}
 		}
-	case message.HEARTBEAT:
+	case phead.MsgType_HEARTBEAT:
 		{
 			err := s.handleHeartbeat(mctx)
 			if err != nil {
@@ -556,7 +558,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 				return err
 			}
 		}
-	case message.HANDSHAKE:
+	case phead.MsgType_HANDSHAKE:
 		{
 			err := s.handleHandshake(mctx)
 			if err != nil {
@@ -574,7 +576,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 			}
 		}
 	default:
-		return handle.NewCriticalErrorf("invalid message type %v", mctx.msgRead)
+		return handle.NewCriticalErrorf("invalid message type %v", mctx.msgRead.GetMsgType())
 	}
 
 	return nil
@@ -805,9 +807,11 @@ func (s *frontendSession) runRead() {
 		if err != nil {
 			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {
 				s.opt.Logger.Errorf("read message error %v", err)
+				s.closeConn(err.Error())
+			} else {
+				// io err 关闭链接
+				s.closeConn("peer close")
 			}
-			// io err 关闭链接
-			s.closeConn("peer close")
 			return
 		}
 
@@ -882,7 +886,9 @@ func (s *frontendSession) closeConn(why string) {
 		return
 	}
 
-	s.opt.Logger.Infof("close conn caused by %s", why)
+	if s.opt.Logger.V(logger.VDEBUG) {
+		s.opt.Logger.Infof("close conn caused by %s", why)
+	}
 
 	// 关闭链接
 	err := s.conn.Close()

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/node/message"
+	phead "github.com/liyiysng/scatter/node/message/proto"
 )
 
 // MsgInfo 消息信息
@@ -47,7 +48,7 @@ type jsonFormatInfo struct {
 	StartTime time.Time `json:"@timestamp"`
 
 	// 消息类型
-	MsgType message.MsgType `json:"msg_type"`
+	MsgType string `json:"msg_type"`
 
 	// 服务
 	Srv string `json:"srv"`
@@ -134,7 +135,7 @@ func (info *MsgInfo) MarshalJSON() ([]byte, error) {
 	}
 
 	if info.MsgRead != nil {
-		js.MsgType = info.MsgRead.GetMsgType()
+		js.MsgType = info.MsgRead.GetMsgType().String()
 		if info.MsgRead.GetService() != "" {
 			serviceName, methodName, err := message.GetSrvMethod(info.MsgRead.GetService())
 			if err != nil {
@@ -146,7 +147,7 @@ func (info *MsgInfo) MarshalJSON() ([]byte, error) {
 		}
 	} else {
 		js.Method = info.MsgWrite.GetService()
-		js.MsgType = message.PUSH
+		js.MsgType = phead.MsgType_PUSH.String()
 	}
 
 	str, err := json.MarshalIndent(js, "", "\t")

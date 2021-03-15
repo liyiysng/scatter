@@ -135,6 +135,622 @@ func (x *SumRes) GetSum() int64 {
 	return 0
 }
 
+type FooReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Req string `protobuf:"bytes,1,opt,name=req,proto3" json:"req,omitempty"`
+}
+
+func (x *FooReq) Reset() {
+	*x = FooReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FooReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FooReq) ProtoMessage() {}
+
+func (x *FooReq) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FooReq.ProtoReflect.Descriptor instead.
+func (*FooReq) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *FooReq) GetReq() string {
+	if x != nil {
+		return x.Req
+	}
+	return ""
+}
+
+type FooRes struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Res        string `protobuf:"bytes,1,opt,name=res,proto3" json:"res,omitempty"`
+	PlayerUID  uint64 `protobuf:"varint,2,opt,name=playerUID,proto3" json:"playerUID,omitempty"`
+	PlayerUIDs uint64 `protobuf:"varint,3,opt,name=playerUIDs,proto3" json:"playerUIDs,omitempty"`
+}
+
+func (x *FooRes) Reset() {
+	*x = FooRes{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FooRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FooRes) ProtoMessage() {}
+
+func (x *FooRes) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FooRes.ProtoReflect.Descriptor instead.
+func (*FooRes) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FooRes) GetRes() string {
+	if x != nil {
+		return x.Res
+	}
+	return ""
+}
+
+func (x *FooRes) GetPlayerUID() uint64 {
+	if x != nil {
+		return x.PlayerUID
+	}
+	return 0
+}
+
+func (x *FooRes) GetPlayerUIDs() uint64 {
+	if x != nil {
+		return x.PlayerUIDs
+	}
+	return 0
+}
+
+type FooPush struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Push string `protobuf:"bytes,1,opt,name=push,proto3" json:"push,omitempty"`
+}
+
+func (x *FooPush) Reset() {
+	*x = FooPush{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FooPush) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FooPush) ProtoMessage() {}
+
+func (x *FooPush) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FooPush.ProtoReflect.Descriptor instead.
+func (*FooPush) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FooPush) GetPush() string {
+	if x != nil {
+		return x.Push
+	}
+	return ""
+}
+
+type FooNotiry struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Notify string `protobuf:"bytes,1,opt,name=notify,proto3" json:"notify,omitempty"`
+}
+
+func (x *FooNotiry) Reset() {
+	*x = FooNotiry{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *FooNotiry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FooNotiry) ProtoMessage() {}
+
+func (x *FooNotiry) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FooNotiry.ProtoReflect.Descriptor instead.
+func (*FooNotiry) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *FooNotiry) GetNotify() string {
+	if x != nil {
+		return x.Notify
+	}
+	return ""
+}
+
+// push
+// 系统公告通知
+type SystemNoticePush struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Content string `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"` // 公告内容
+}
+
+func (x *SystemNoticePush) Reset() {
+	*x = SystemNoticePush{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SystemNoticePush) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SystemNoticePush) ProtoMessage() {}
+
+func (x *SystemNoticePush) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SystemNoticePush.ProtoReflect.Descriptor instead.
+func (*SystemNoticePush) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SystemNoticePush) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+//notify
+type ChatNotify struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ToUID   int64  `protobuf:"varint,1,opt,name=toUID,proto3" json:"toUID,omitempty"`    // 对方UID
+	Content string `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"` //聊天内容
+}
+
+func (x *ChatNotify) Reset() {
+	*x = ChatNotify{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ChatNotify) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatNotify) ProtoMessage() {}
+
+func (x *ChatNotify) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatNotify.ProtoReflect.Descriptor instead.
+func (*ChatNotify) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ChatNotify) GetToUID() int64 {
+	if x != nil {
+		return x.ToUID
+	}
+	return 0
+}
+
+func (x *ChatNotify) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type DataSegment_1 struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UID        int64  `protobuf:"varint,1,opt,name=UID,proto3" json:"UID,omitempty"`
+	StrContent string `protobuf:"bytes,2,opt,name=strContent,proto3" json:"strContent,omitempty"`
+}
+
+func (x *DataSegment_1) Reset() {
+	*x = DataSegment_1{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DataSegment_1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataSegment_1) ProtoMessage() {}
+
+func (x *DataSegment_1) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataSegment_1.ProtoReflect.Descriptor instead.
+func (*DataSegment_1) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DataSegment_1) GetUID() int64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *DataSegment_1) GetStrContent() string {
+	if x != nil {
+		return x.StrContent
+	}
+	return ""
+}
+
+type DataSegment_2 struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UID        int64  `protobuf:"varint,1,opt,name=UID,proto3" json:"UID,omitempty"`
+	StrContent string `protobuf:"bytes,2,opt,name=strContent,proto3" json:"strContent,omitempty"`
+}
+
+func (x *DataSegment_2) Reset() {
+	*x = DataSegment_2{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DataSegment_2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataSegment_2) ProtoMessage() {}
+
+func (x *DataSegment_2) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataSegment_2.ProtoReflect.Descriptor instead.
+func (*DataSegment_2) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DataSegment_2) GetUID() int64 {
+	if x != nil {
+		return x.UID
+	}
+	return 0
+}
+
+func (x *DataSegment_2) GetStrContent() string {
+	if x != nil {
+		return x.StrContent
+	}
+	return ""
+}
+
+type DynamicSegment_1 struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id  int32  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Str string `protobuf:"bytes,2,opt,name=str,proto3" json:"str,omitempty"`
+	B   bool   `protobuf:"varint,3,opt,name=b,proto3" json:"b,omitempty"`
+}
+
+func (x *DynamicSegment_1) Reset() {
+	*x = DynamicSegment_1{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DynamicSegment_1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DynamicSegment_1) ProtoMessage() {}
+
+func (x *DynamicSegment_1) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DynamicSegment_1.ProtoReflect.Descriptor instead.
+func (*DynamicSegment_1) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DynamicSegment_1) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *DynamicSegment_1) GetStr() string {
+	if x != nil {
+		return x.Str
+	}
+	return ""
+}
+
+func (x *DynamicSegment_1) GetB() bool {
+	if x != nil {
+		return x.B
+	}
+	return false
+}
+
+type DynamicSegment_2 struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id  int32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Str string  `protobuf:"bytes,2,opt,name=str,proto3" json:"str,omitempty"`
+	D   float64 `protobuf:"fixed64,3,opt,name=d,proto3" json:"d,omitempty"`
+}
+
+func (x *DynamicSegment_2) Reset() {
+	*x = DynamicSegment_2{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DynamicSegment_2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DynamicSegment_2) ProtoMessage() {}
+
+func (x *DynamicSegment_2) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DynamicSegment_2.ProtoReflect.Descriptor instead.
+func (*DynamicSegment_2) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DynamicSegment_2) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *DynamicSegment_2) GetStr() string {
+	if x != nil {
+		return x.Str
+	}
+	return ""
+}
+
+func (x *DynamicSegment_2) GetD() float64 {
+	if x != nil {
+		return x.D
+	}
+	return 0
+}
+
+type DataTest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Segment_1 *DataSegment_1      `protobuf:"bytes,1,opt,name=segment_1,json=segment1,proto3" json:"segment_1,omitempty"`
+	Segment_2 *DataSegment_2      `protobuf:"bytes,2,opt,name=segment_2,json=segment2,proto3" json:"segment_2,omitempty"`
+	Ds_1      []*DynamicSegment_1 `protobuf:"bytes,3,rep,name=ds_1,json=ds1,proto3" json:"ds_1,omitempty"`
+	Ds_2      []*DynamicSegment_2 `protobuf:"bytes,4,rep,name=ds_2,json=ds2,proto3" json:"ds_2,omitempty"`
+}
+
+func (x *DataTest) Reset() {
+	*x = DataTest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_testing_node_testing_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DataTest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataTest) ProtoMessage() {}
+
+func (x *DataTest) ProtoReflect() protoreflect.Message {
+	mi := &file_testing_node_testing_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataTest.ProtoReflect.Descriptor instead.
+func (*DataTest) Descriptor() ([]byte, []int) {
+	return file_testing_node_testing_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DataTest) GetSegment_1() *DataSegment_1 {
+	if x != nil {
+		return x.Segment_1
+	}
+	return nil
+}
+
+func (x *DataTest) GetSegment_2() *DataSegment_2 {
+	if x != nil {
+		return x.Segment_2
+	}
+	return nil
+}
+
+func (x *DataTest) GetDs_1() []*DynamicSegment_1 {
+	if x != nil {
+		return x.Ds_1
+	}
+	return nil
+}
+
+func (x *DataTest) GetDs_2() []*DynamicSegment_2 {
+	if x != nil {
+		return x.Ds_2
+	}
+	return nil
+}
+
 var File_testing_node_testing_proto protoreflect.FileDescriptor
 
 var file_testing_node_testing_proto_rawDesc = []byte{
@@ -146,8 +762,55 @@ var file_testing_node_testing_proto_rawDesc = []byte{
 	0x74, 0x61, 0x53, 0x74, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x44, 0x61, 0x74,
 	0x61, 0x53, 0x74, 0x72, 0x22, 0x1a, 0x0a, 0x06, 0x53, 0x75, 0x6d, 0x52, 0x65, 0x73, 0x12, 0x10,
 	0x0a, 0x03, 0x53, 0x75, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x53, 0x75, 0x6d,
-	0x42, 0x13, 0x5a, 0x11, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x6e, 0x6f, 0x64, 0x65, 0x5f, 0x74, 0x65,
-	0x73, 0x74, 0x69, 0x6e, 0x67, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x22, 0x1a, 0x0a, 0x06, 0x46, 0x6f, 0x6f, 0x52, 0x65, 0x71, 0x12, 0x10, 0x0a, 0x03, 0x72, 0x65,
+	0x71, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x72, 0x65, 0x71, 0x22, 0x58, 0x0a, 0x06,
+	0x46, 0x6f, 0x6f, 0x52, 0x65, 0x73, 0x12, 0x10, 0x0a, 0x03, 0x72, 0x65, 0x73, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x03, 0x72, 0x65, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x70, 0x6c, 0x61, 0x79,
+	0x65, 0x72, 0x55, 0x49, 0x44, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x70, 0x6c, 0x61,
+	0x79, 0x65, 0x72, 0x55, 0x49, 0x44, 0x12, 0x1e, 0x0a, 0x0a, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72,
+	0x55, 0x49, 0x44, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x70, 0x6c, 0x61, 0x79,
+	0x65, 0x72, 0x55, 0x49, 0x44, 0x73, 0x22, 0x1d, 0x0a, 0x07, 0x46, 0x6f, 0x6f, 0x50, 0x75, 0x73,
+	0x68, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x75, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x70, 0x75, 0x73, 0x68, 0x22, 0x23, 0x0a, 0x09, 0x46, 0x6f, 0x6f, 0x4e, 0x6f, 0x74, 0x69,
+	0x72, 0x79, 0x12, 0x16, 0x0a, 0x06, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x79, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x06, 0x6e, 0x6f, 0x74, 0x69, 0x66, 0x79, 0x22, 0x2c, 0x0a, 0x10, 0x53, 0x79,
+	0x73, 0x74, 0x65, 0x6d, 0x4e, 0x6f, 0x74, 0x69, 0x63, 0x65, 0x50, 0x75, 0x73, 0x68, 0x12, 0x18,
+	0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x3c, 0x0a, 0x0a, 0x43, 0x68, 0x61, 0x74,
+	0x4e, 0x6f, 0x74, 0x69, 0x66, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x6f, 0x55, 0x49, 0x44, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x05, 0x74, 0x6f, 0x55, 0x49, 0x44, 0x12, 0x18, 0x0a, 0x07,
+	0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x41, 0x0a, 0x0d, 0x44, 0x61, 0x74, 0x61, 0x53, 0x65,
+	0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x31, 0x12, 0x10, 0x0a, 0x03, 0x55, 0x49, 0x44, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x55, 0x49, 0x44, 0x12, 0x1e, 0x0a, 0x0a, 0x73, 0x74, 0x72,
+	0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73,
+	0x74, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x41, 0x0a, 0x0d, 0x44, 0x61, 0x74,
+	0x61, 0x53, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x32, 0x12, 0x10, 0x0a, 0x03, 0x55, 0x49,
+	0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x55, 0x49, 0x44, 0x12, 0x1e, 0x0a, 0x0a,
+	0x73, 0x74, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0a, 0x73, 0x74, 0x72, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22, 0x42, 0x0a, 0x10,
+	0x44, 0x79, 0x6e, 0x61, 0x6d, 0x69, 0x63, 0x53, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x31,
+	0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x69, 0x64,
+	0x12, 0x10, 0x0a, 0x03, 0x73, 0x74, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x73,
+	0x74, 0x72, 0x12, 0x0c, 0x0a, 0x01, 0x62, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x01, 0x62,
+	0x22, 0x42, 0x0a, 0x10, 0x44, 0x79, 0x6e, 0x61, 0x6d, 0x69, 0x63, 0x53, 0x65, 0x67, 0x6d, 0x65,
+	0x6e, 0x74, 0x5f, 0x32, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05,
+	0x52, 0x02, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x73, 0x74, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x03, 0x73, 0x74, 0x72, 0x12, 0x0c, 0x0a, 0x01, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x01, 0x52, 0x01, 0x64, 0x22, 0xb0, 0x01, 0x0a, 0x08, 0x44, 0x61, 0x74, 0x61, 0x54, 0x65, 0x73,
+	0x74, 0x12, 0x2b, 0x0a, 0x09, 0x73, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x31, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x53, 0x65, 0x67, 0x6d, 0x65,
+	0x6e, 0x74, 0x5f, 0x31, 0x52, 0x08, 0x73, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x31, 0x12, 0x2b,
+	0x0a, 0x09, 0x73, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x32, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x0e, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x53, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f,
+	0x32, 0x52, 0x08, 0x73, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x32, 0x12, 0x24, 0x0a, 0x04, 0x64,
+	0x73, 0x5f, 0x31, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x44, 0x79, 0x6e, 0x61,
+	0x6d, 0x69, 0x63, 0x53, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x31, 0x52, 0x03, 0x64, 0x73,
+	0x31, 0x12, 0x24, 0x0a, 0x04, 0x64, 0x73, 0x5f, 0x32, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32,
+	0x11, 0x2e, 0x44, 0x79, 0x6e, 0x61, 0x6d, 0x69, 0x63, 0x53, 0x65, 0x67, 0x6d, 0x65, 0x6e, 0x74,
+	0x5f, 0x32, 0x52, 0x03, 0x64, 0x73, 0x32, 0x42, 0x13, 0x5a, 0x11, 0x6e, 0x6f, 0x64, 0x65, 0x2f,
+	0x6e, 0x6f, 0x64, 0x65, 0x5f, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -162,17 +825,32 @@ func file_testing_node_testing_proto_rawDescGZIP() []byte {
 	return file_testing_node_testing_proto_rawDescData
 }
 
-var file_testing_node_testing_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_testing_node_testing_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_testing_node_testing_proto_goTypes = []interface{}{
-	(*SumReq)(nil), // 0: SumReq
-	(*SumRes)(nil), // 1: SumRes
+	(*SumReq)(nil),           // 0: SumReq
+	(*SumRes)(nil),           // 1: SumRes
+	(*FooReq)(nil),           // 2: FooReq
+	(*FooRes)(nil),           // 3: FooRes
+	(*FooPush)(nil),          // 4: FooPush
+	(*FooNotiry)(nil),        // 5: FooNotiry
+	(*SystemNoticePush)(nil), // 6: SystemNoticePush
+	(*ChatNotify)(nil),       // 7: ChatNotify
+	(*DataSegment_1)(nil),    // 8: DataSegment_1
+	(*DataSegment_2)(nil),    // 9: DataSegment_2
+	(*DynamicSegment_1)(nil), // 10: DynamicSegment_1
+	(*DynamicSegment_2)(nil), // 11: DynamicSegment_2
+	(*DataTest)(nil),         // 12: DataTest
 }
 var file_testing_node_testing_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	8,  // 0: DataTest.segment_1:type_name -> DataSegment_1
+	9,  // 1: DataTest.segment_2:type_name -> DataSegment_2
+	10, // 2: DataTest.ds_1:type_name -> DynamicSegment_1
+	11, // 3: DataTest.ds_2:type_name -> DynamicSegment_2
+	4,  // [4:4] is the sub-list for method output_type
+	4,  // [4:4] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_testing_node_testing_proto_init() }
@@ -205,6 +883,138 @@ func file_testing_node_testing_proto_init() {
 				return nil
 			}
 		}
+		file_testing_node_testing_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FooReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FooRes); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FooPush); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*FooNotiry); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SystemNoticePush); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ChatNotify); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DataSegment_1); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DataSegment_2); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DynamicSegment_1); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DynamicSegment_2); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_testing_node_testing_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DataTest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -212,7 +1022,7 @@ func file_testing_node_testing_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_testing_node_testing_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

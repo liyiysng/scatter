@@ -170,7 +170,6 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 		err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
 
 		if err != nil {
-			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s error %v", serviceName, methodName, err)
 			return
 		}
 

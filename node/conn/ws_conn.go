@@ -2,6 +2,7 @@ package conn
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"time"
 
@@ -78,6 +79,14 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt,
 
 	_, buf, err := c.Conn.ReadMessage()
 	if err != nil {
+		if werr, ok := err.(*websocket.CloseError); ok {
+			if werr.Code == websocket.CloseNormalClosure {
+				return nil, message.DEFAULTPOPT, io.EOF
+			}
+			if werr.Code == websocket.CloseAbnormalClosure {
+				return nil, message.DEFAULTPOPT, io.ErrUnexpectedEOF
+			}
+		}
 		return nil, message.DEFAULTPOPT, err
 	}
 	if c.rdBuket != nil {
@@ -116,6 +125,10 @@ func (c *wsConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) e
 	writeBuffer := util.BufferPoolGet()
 	defer util.BufferPoolPut(writeBuffer)
 
+	_, err = p.WriteTo(writeBuffer, c.opt.Compresser, c.opt.MaxLength)
+	if err != nil {
+		return err
+	}
 	if c.opt.WriteTimeout != 0 {
 		c.SetWriteDeadline(time.Now().Add(c.opt.WriteTimeout))
 	}

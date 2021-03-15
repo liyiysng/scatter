@@ -286,7 +286,9 @@ func (n *Node) Stop() {
 		return
 	}
 
-	n.opts.Logger.Infof("stopping node %d", n.opts.ID)
+	if n.opts.Logger.V(logger.VDEBUG) {
+		n.opts.Logger.Infof("stopping node %d", n.opts.ID)
+	}
 
 	n.quit.Fire()
 
@@ -301,7 +303,9 @@ func (n *Node) Stop() {
 			}
 
 		}
-		n.opts.Logger.Infof("node %d stoped", n.opts.ID)
+		if n.opts.Logger.V(logger.VIMPORTENT) {
+			n.opts.Logger.Infof("node %d stoped", n.opts.ID)
+		}
 	}()
 
 	n.mu.Lock()
@@ -375,7 +379,9 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		MaxMsgCacheNum:    3,
 	})
 
-	n.opts.Logger.Infof("new connect %v comming", s.PeerAddr())
+	if n.opts.Logger.V(logger.VDEBUG) {
+		n.opts.Logger.Infof("new connection %v comming", s.PeerAddr())
+	}
 
 	n.mu.Lock()
 	if n.sessions == nil { // stoped
@@ -386,7 +392,9 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	n.mu.Unlock()
 
 	defer func() {
-		n.opts.Logger.Infof("connect %v leave", s.PeerAddr())
+		if n.opts.Logger.V(logger.VDEBUG) {
+			n.opts.Logger.Infof("connection %v leave", s.PeerAddr())
+		}
 		n.mu.Lock()
 		if n.sessions == nil { // stoped
 			n.mu.Unlock()

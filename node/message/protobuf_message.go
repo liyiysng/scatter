@@ -23,7 +23,7 @@ func (m *ProtobufMsg) FromBytes(b []byte) error {
 // ToBytes 实现Message接口
 func (m *ProtobufMsg) ToBytes() (b []byte, err error) {
 	//若时回复消息,service字段无需序列化
-	if m.GetMsgType() == RESPONSE {
+	if m.GetMsgType() == phead.MsgType_RESPONSE {
 		srv := m.Head.Service
 		m.Head.Service = ""
 		b, err = proto.Marshal(&m.Head)
@@ -52,7 +52,7 @@ func (f *protoBufFactory) BuildMessage(buf []byte) (msg Message, err error) {
 func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType: int32(PUSH),
+			MsgType: phead.MsgType_PUSH,
 			Service: cmd,
 			Payload: data,
 		},
@@ -64,7 +64,7 @@ func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message
 func (f *protoBufFactory) BuildHeatAckMessage() (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType: int32(HEARTBEATACK),
+			MsgType: phead.MsgType_HEARTBEATACK,
 		},
 	}
 	return
@@ -86,7 +86,7 @@ func (f *protoBufFactory) BuildHandShakeMessage(platform, clientVersion, buildVe
 
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType: int32(HANDSHAKE),
+			MsgType: phead.MsgType_HANDSHAKE,
 			Payload: buf,
 		},
 	}
@@ -97,7 +97,7 @@ func (f *protoBufFactory) BuildHandShakeMessage(platform, clientVersion, buildVe
 func (f *protoBufFactory) BuildHandShakeAckMessage() (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType: int32(HANDSHAKEACK),
+			MsgType: phead.MsgType_HANDSHAKEACK,
 		},
 	}
 	return
@@ -107,7 +107,7 @@ func (f *protoBufFactory) BuildHandShakeAckMessage() (msg Message, err error) {
 func (f *protoBufFactory) BuildResponseMessage(sequence int32, srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType:  int32(RESPONSE),
+			MsgType:  phead.MsgType_RESPONSE,
 			Service:  srv,
 			Sequence: sequence,
 			Payload:  payload,
@@ -120,7 +120,7 @@ func (f *protoBufFactory) BuildResponseMessage(sequence int32, srv string, paylo
 func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType:     int32(RESPONSE),
+			MsgType:     phead.MsgType_RESPONSE,
 			Service:     srv,
 			Sequence:    sequence,
 			CustomError: customError,
@@ -144,7 +144,7 @@ func (f *protoBufFactory) ParseHandShake(buf []byte) (h interface{}, err error) 
 func (f *protoBufFactory) BuildRequestMessage(sequence int32, srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType:  int32(REQUEST),
+			MsgType:  phead.MsgType_REQUEST,
 			Service:  srv,
 			Sequence: sequence,
 			Payload:  payload,
@@ -157,7 +157,7 @@ func (f *protoBufFactory) BuildRequestMessage(sequence int32, srv string, payloa
 func (f *protoBufFactory) BuildNotifyMessage(srv string, payload []byte) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType: int32(NOTIFY),
+			MsgType: phead.MsgType_NOTIFY,
 			Service: srv,
 			Payload: payload,
 		},
