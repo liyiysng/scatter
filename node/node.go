@@ -4,12 +4,14 @@ package node
 import (
 	"context"
 	"fmt"
+	"net"
 	"reflect"
 	"runtime"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/liyiysng/scatter/cluster"
 	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
@@ -19,6 +21,7 @@ import (
 	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/util"
 	"golang.org/x/net/trace"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -65,6 +68,9 @@ type Node struct {
 	// 处理
 	srvHandle handle.IHandler
 
+	// grpc node
+	gnode *cluster.GrpcNode
+
 	// 标识是否服务
 	serve bool
 }
@@ -89,11 +95,11 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 
 	// 缺省日志
 	if opts.Logger == nil {
-		if opts.LogPrefix != "" {
-			opts.Logger = logger.NewPrefixLogger(logger.GDepthLogger, opts.LogPrefix)
-		} else {
-			opts.Logger = logger.GDepthLogger
-		}
+		opts.Logger = logger.GDepthLogger
+	}
+
+	if opts.LogPrefix != "" {
+		opts.Logger = logger.NewPrefixLogger(opts.Logger, opts.LogPrefix)
 	}
 
 	if opts.Name == "" {
@@ -106,6 +112,7 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		startTime: time.Now(),
 		sessions:  make(map[int64]session.FrontendSession),
 		quit:      util.NewEvent(),
+		gnode:     cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10), cluster.OptWithLogger(opts.Logger)),
 	}
 
 	n.idGen, err = util.NewNode(nid)
@@ -160,6 +167,31 @@ func (n *Node) RegisterName(name string, recv interface{}) error {
 	}
 
 	return n.srvHandle.RegisterName(name, recv)
+}
+
+// RegisterService implement grpc.ServiceRegistrar
+func (n *Node) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.gnode == nil {
+		panic(constants.ErrNodeStopped)
+	}
+	n.gnode.RegisterService(desc, impl)
+}
+
+// RunGrpc run grpc server
+func (n *Node) RunGrpc(lis net.Listener) error {
+	n.waitGroup.Add(1)
+	defer n.waitGroup.Done()
+
+	n.mu.Lock()
+	if n.gnode == nil {
+		n.mu.Unlock()
+		return constants.ErrNodeStopped
+	}
+	n.mu.Unlock()
+
+	return n.gnode.Serve(lis)
 }
 
 // Serve 启动一个Serve
@@ -328,6 +360,14 @@ func (n *Node) Stop() {
 		n.trEvents = nil
 	}
 	n.mu.Unlock()
+
+	n.mu.Lock()
+	if n.gnode != nil {
+		n.gnode.Stop()
+		n.gnode = nil
+	}
+	n.mu.Unlock()
+
 }
 
 // 记录事件日志

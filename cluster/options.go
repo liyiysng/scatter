@@ -70,3 +70,10 @@ func OptWithConfig(cfg *config.Config) IOption {
 		o.cfg = cfg
 	})
 }
+
+// OptWithLogger 配置
+func OptWithLogger(l logger.Logger) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.logerr = l
+	})
+}
