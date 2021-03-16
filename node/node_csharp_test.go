@@ -70,7 +70,7 @@ func TestCSharpClient(t *testing.T) {
 
 	defer n.Stop()
 
-	n.Register(&SrvTest{})
+	n.RegisterFront(&SrvTest{})
 
 	err = n.Serve(SocketProtcolWS, "127.0.0.1:4545")
 	if err != nil {

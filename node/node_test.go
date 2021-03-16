@@ -306,7 +306,7 @@ func TestNodeService(t *testing.T) {
 	}
 	defer n.Stop()
 
-	n.Register(&ServiceTest{})
+	n.RegisterFront(&ServiceTest{})
 
 	srvNode(n)
 
@@ -378,7 +378,7 @@ func BenchmarkRPCSingleClient(b *testing.B) {
 	}
 	defer n.Stop()
 
-	n.Register(&ServiceTest{})
+	n.RegisterFront(&ServiceTest{})
 
 	srvNode(n)
 
@@ -572,7 +572,7 @@ func BenchmarkRPC(b *testing.B) {
 	}
 	defer n.Stop()
 
-	n.Register(&ServiceTest{})
+	n.RegisterFront(&ServiceTest{})
 
 	srvNode(n)
 
@@ -723,7 +723,7 @@ func TestNodeMsgOpt(t *testing.T) {
 
 	defer n.Stop()
 
-	n.Register(&ServiceTest{})
+	n.RegisterFront(&ServiceTest{})
 
 	srvNode(n)
 
@@ -847,7 +847,7 @@ func TestNodeMetrics(t *testing.T) {
 
 	defer n.Stop()
 
-	n.Register(&ServiceMetricsTest{})
+	n.RegisterFront(&ServiceMetricsTest{})
 
 	srvNode(n)
 
@@ -953,7 +953,7 @@ func TestNodeEsSink(t *testing.T) {
 
 	defer n.Stop()
 
-	n.Register(&ServiceMetricsTest{})
+	n.RegisterFront(&ServiceMetricsTest{})
 
 	srvNode(n)
 

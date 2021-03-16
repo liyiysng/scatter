@@ -139,8 +139,8 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 	return
 }
 
-// Register 注册服务
-func (n *Node) Register(recv interface{}) error {
+// RegisterFront 注册前端服务
+func (n *Node) RegisterFront(recv interface{}) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.accs == nil {
@@ -154,8 +154,8 @@ func (n *Node) Register(recv interface{}) error {
 	return n.srvHandle.Register(recv)
 }
 
-// RegisterName 注册命名服务
-func (n *Node) RegisterName(name string, recv interface{}) error {
+// RegisterFrontName 注册命名前端服务
+func (n *Node) RegisterFrontName(name string, recv interface{}) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.accs == nil {
@@ -167,6 +167,18 @@ func (n *Node) RegisterName(name string, recv interface{}) error {
 	}
 
 	return n.srvHandle.RegisterName(name, recv)
+}
+
+// GetGrpcClient 获取grpc client
+func (n *Node) GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.gnode == nil {
+		return nil, constants.ErrNodeStopped
+	}
+
+	return n.gnode.GetClient(srvName)
 }
 
 // RegisterService implement grpc.ServiceRegistrar
