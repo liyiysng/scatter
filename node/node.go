@@ -3,6 +3,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/cluster"
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/acceptor"
@@ -29,6 +29,13 @@ var (
 	myLog = logger.Component("node")
 )
 
+var (
+	// ErrNodeStopped 节点已停止
+	ErrNodeStopped = errors.New("node: the node has been stopped")
+	// ErrInvalidCertificates 证书配置错误
+	ErrInvalidCertificates = errors.New("certificates must be exactly two")
+)
+
 // SocketProtcol 协议类型
 type SocketProtcol string
 
@@ -39,9 +46,44 @@ const (
 	SocketProtcolWS SocketProtcol = "ws"
 )
 
-// 内部错误
-type errStore struct {
-	err error
+// FrontRegister 注册前端服务
+// 函数签名 func (context.Context,session session.Session,req proto.Message,optionalArg...) (res proto.Message , err error)
+type FrontRegister interface {
+	// RegisterFront 注册一个前端服务
+	RegisterFront(recv interface{}) error
+	// RegisterFrontName 注册一个前端命名服务
+	RegisterFrontName(name string, recv interface{}) error
+}
+
+// GrpcRegister grpc服务注册
+type GrpcRegister interface {
+	grpc.ServiceRegistrar
+}
+
+// INodeRegister node 注册
+type INodeRegister interface {
+	FrontRegister
+	GrpcRegister
+}
+
+// INodeServe node 服务器
+type INodeServe interface {
+	// RunGrpc 运行grpc服务,阻塞函数,一般运行在单独的goroutine
+	RunGrpc(lis net.Listener) error
+	// Serve 启动一个前端Serve,阻塞函数,一般运行在单独的goroutine
+	// Serve 除Stop或者 被调用之外,都返回一个非nil错误
+	// arg[0] = certfile
+	// arg[1] = keyfile
+	Serve(sp SocketProtcol, addr string, cert ...string) error
+	// 停止该节点
+	Stop()
+}
+
+// INodeGrpcClient node 的客户端
+// 用于服务调用
+type INodeGrpcClient interface {
+	// GetGrpcClient 根据服务名获得客户端
+	GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err error)
 }
 
 // Node represent
@@ -71,6 +113,9 @@ type Node struct {
 
 	// grpc node
 	gnode *cluster.GrpcNode
+
+	// 停止历程
+	stopRoutine sync.Once
 
 	// 标识是否服务
 	serve bool
@@ -145,7 +190,7 @@ func (n *Node) RegisterFront(recv interface{}) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.accs == nil {
-		return constants.ErrNodeStopped
+		return ErrNodeStopped
 	}
 
 	if n.serve {
@@ -160,7 +205,7 @@ func (n *Node) RegisterFrontName(name string, recv interface{}) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.accs == nil {
-		return constants.ErrNodeStopped
+		return ErrNodeStopped
 	}
 
 	if n.serve {
@@ -176,7 +221,7 @@ func (n *Node) GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err er
 	defer n.mu.Unlock()
 
 	if n.gnode == nil {
-		return nil, constants.ErrNodeStopped
+		return nil, ErrNodeStopped
 	}
 
 	return n.gnode.GetClient(srvName)
@@ -187,7 +232,7 @@ func (n *Node) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.gnode == nil {
-		panic(constants.ErrNodeStopped)
+		panic(ErrNodeStopped)
 	}
 	n.gnode.RegisterService(desc, impl)
 }
@@ -200,11 +245,23 @@ func (n *Node) RunGrpc(lis net.Listener) error {
 	n.mu.Lock()
 	if n.gnode == nil {
 		n.mu.Unlock()
-		return constants.ErrNodeStopped
+		return ErrNodeStopped
 	}
 	n.mu.Unlock()
 
 	return n.gnode.Serve(lis)
+}
+
+// AddAfterStop 添加停止后需执行的函数
+func (n *Node) AddAfterStop(f ...func()) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.accs == nil {
+		return ErrNodeStopped
+	}
+
+	n.opts.afterStop = append(n.opts.afterStop, f...)
+	return nil
 }
 
 // Serve 启动一个Serve
@@ -223,7 +280,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 	if n.accs == nil {
 		// Start called after Stop
 		n.mu.Unlock()
-		return constants.ErrNodeStopped
+		return ErrNodeStopped
 	}
 
 	certFile := ""
@@ -232,7 +289,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 	if len(cert) > 0 {
 		if len(cert) != 2 {
 			n.mu.Unlock()
-			return constants.ErrInvalidCertificates
+			return ErrInvalidCertificates
 		}
 		certFile = cert[0]
 		keyFile = cert[1]
@@ -339,18 +396,26 @@ func (n *Node) Stop() {
 
 	defer func() {
 		n.waitGroup.Wait()
-		if n.opts.textLogWriter != nil && len(n.opts.textLogWriter) > 0 {
-			for _, v := range n.opts.textLogWriter {
-				err := v.Close()
-				if err != nil {
-					n.opts.Logger.Errorf("close text log failed %v", err)
+		// 清理历程
+		n.stopRoutine.Do(func() {
+			if n.opts.textLogWriter != nil && len(n.opts.textLogWriter) > 0 {
+				for _, v := range n.opts.textLogWriter {
+					err := v.Close()
+					if err != nil {
+						n.opts.Logger.Errorf("close text log failed %v", err)
+					}
+				}
+
+			}
+			if n.opts.Logger.V(logger.VIMPORTENT) {
+				n.opts.Logger.Infof("node %d stoped", n.opts.ID)
+			}
+			if len(n.opts.afterStop) > 0 {
+				for _, f := range n.opts.afterStop {
+					f()
 				}
 			}
-
-		}
-		if n.opts.Logger.V(logger.VIMPORTENT) {
-			n.opts.Logger.Infof("node %d stoped", n.opts.ID)
-		}
+		})
 	}()
 
 	n.mu.Lock()

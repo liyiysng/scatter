@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"sync"
 
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/util"
 )
@@ -104,7 +103,7 @@ func (p *Packet) ReadFrom(r packageReader, compressor encoding.Compressor, maxLe
 		return n, err
 	}
 	if dataLength > int32(maxLength) || dataLength < 0 {
-		return n, constants.ErrMsgTooLager
+		return n, ErrMsgTooLager
 	}
 	n += 4
 
@@ -138,7 +137,7 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 
 	length := len(p.Data)
 	if length > maxLength {
-		return 0, constants.ErrMsgTooLager
+		return 0, ErrMsgTooLager
 	}
 
 	bufToWrite := p.Data

@@ -978,9 +978,8 @@ func TestNodeEsSink(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 
+		wwg.Add(1)
 		go func() {
-
-			wwg.Add(1)
 			defer wwg.Done()
 
 			// 创建客户端

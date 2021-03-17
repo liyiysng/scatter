@@ -3,6 +3,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"net"
 	"time"
 
@@ -13,6 +14,15 @@ import (
 
 var (
 	myLog = logger.Component("session")
+)
+
+var (
+	// ErrSessionClosed session已关闭
+	ErrSessionClosed = errors.New("session closed")
+	// ErrorPushBufferFull session push缓冲已满
+	ErrorPushBufferFull = errors.New("session push full")
+	// ErrorMsgDiscard 消息被丢弃
+	ErrorMsgDiscard = errors.New("message discard")
 )
 
 // OnClose 关闭回调类型

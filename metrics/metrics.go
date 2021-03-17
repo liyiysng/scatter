@@ -2,11 +2,20 @@
 package metrics
 
 import (
+	"errors"
+
 	"github.com/liyiysng/scatter/logger"
 )
 
 var (
 	myLog = logger.Component("metrics")
+)
+
+var (
+	// ErrMetricNotKnown 未知的指标
+	ErrMetricNotKnown = errors.New("the provided metric does not exist")
+	// ErrReporterClosed 指标回报关闭
+	ErrReporterClosed = errors.New("metric reporter closed")
 )
 
 // Reporter interface

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/cluster/selector/policy"
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/conn"
@@ -236,7 +235,7 @@ func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, p
 	}
 
 	if s.closeEvent.HasFired() {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	p := message.DEFAULTPOPT
@@ -282,7 +281,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.writeChanClosed {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	select {
@@ -297,8 +296,8 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 		}
 	case <-s.closeEvent.Done():
 		{
-			s.finishMsg(mctx, constants.ErrSessionClosed)
-			return constants.ErrSessionClosed
+			s.finishMsg(mctx, ErrSessionClosed)
+			return ErrSessionClosed
 		}
 	}
 }
@@ -306,7 +305,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	data, err := s.opt.Codec.Marshal(v)
@@ -341,7 +340,7 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interfa
 func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	data, err := s.opt.Codec.Marshal(v)
@@ -387,7 +386,7 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.writeChanClosed {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	select {
@@ -397,13 +396,13 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 		}
 	case <-s.closeEvent.Done():
 		{
-			s.finishMsg(mctx, constants.ErrSessionClosed)
-			return constants.ErrSessionClosed
+			s.finishMsg(mctx, ErrSessionClosed)
+			return ErrSessionClosed
 		}
 	default:
 		{
-			s.finishMsg(mctx, constants.ErrorPushBufferFull)
-			return constants.ErrorPushBufferFull
+			s.finishMsg(mctx, ErrorPushBufferFull)
+			return ErrorPushBufferFull
 		}
 	}
 }
@@ -420,7 +419,7 @@ func (s *frontendSession) Closed() bool {
 
 func (s *frontendSession) Kick() error {
 	if s.closeEvent.HasFired() {
-		return constants.ErrSessionClosed
+		return ErrSessionClosed
 	}
 
 	mctx := getMsgCtx(s.opt.EnableTraceDetail, message.DEFAULTPOPT)
@@ -747,7 +746,7 @@ func (s *frontendSession) sendWrite(mctx *msgCtx) error {
 		}
 	case <-s.closeEvent.Done():
 		{
-			return constants.ErrSessionClosed
+			return ErrSessionClosed
 		}
 	}
 }
@@ -807,7 +806,7 @@ func (s *frontendSession) flush() error {
 	if !s.connClosed {
 		err = s.conn.Flush()
 	} else {
-		err = constants.ErrSessionClosed
+		err = ErrSessionClosed
 	}
 	s.connMu.Unlock()
 	return err
@@ -824,7 +823,7 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 	if !s.connClosed {
 		err = s.conn.WriteNextMessage(mctx.msgWrite, mctx.popt)
 	} else {
-		err = fmt.Errorf("%v message:{%v}", constants.ErrSessionClosed, mctx.msgWrite)
+		err = fmt.Errorf("%v message:{%v}", ErrSessionClosed, mctx.msgWrite)
 	}
 	s.connMu.Unlock()
 
@@ -926,7 +925,7 @@ func (s *frontendSession) drainWrite() {
 				continue
 			}
 		} else { // 写消息错误 , 丢弃剩余消息
-			s.finishMsg(mctx, constants.ErrorMsgDiscard)
+			s.finishMsg(mctx, ErrorMsgDiscard)
 		}
 	}
 }
@@ -938,7 +937,7 @@ func (s *frontendSession) drainRead() {
 		if !ok { // chan closed
 			return
 		}
-		s.finishMsg(mctx, constants.ErrorMsgDiscard)
+		s.finishMsg(mctx, ErrorMsgDiscard)
 	}
 }
 

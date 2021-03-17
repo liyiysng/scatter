@@ -13,6 +13,11 @@ var (
 	myLog = logger.Component("message")
 )
 
+var (
+	// ErrMsgTooLager 消息过长
+	ErrMsgTooLager = errors.New("message too large")
+)
+
 // MsgType 消息类型
 type MsgType = proto.MsgType
 

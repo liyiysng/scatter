@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/ratelimit"
 )
@@ -83,7 +82,7 @@ func (c *tcpConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) 
 		return err
 	}
 	if len(buf) > c.opt.MaxLength {
-		return constants.ErrMsgTooLager
+		return message.ErrMsgTooLager
 	}
 	p := message.PackagePoolGet()
 	defer message.PackagePoolPut(p)

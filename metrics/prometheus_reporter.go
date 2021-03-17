@@ -215,7 +215,7 @@ func NewPrometheusReporter(
 func (p *PrometheusReporter) ReportSummary(metric string, labels map[string]string, value float64) error {
 
 	if p.closeEvent.HasFired() {
-		return constants.ErrReporterClosed
+		return ErrReporterClosed
 	}
 
 	sum := p.summaryReportersMap[metric]
@@ -224,14 +224,14 @@ func (p *PrometheusReporter) ReportSummary(metric string, labels map[string]stri
 		sum.With(labels).Observe(value)
 		return nil
 	}
-	return constants.ErrMetricNotKnown
+	return ErrMetricNotKnown
 }
 
 // ReportCount reports a summary metric
 func (p *PrometheusReporter) ReportCount(metric string, labels map[string]string, count float64) error {
 
 	if p.closeEvent.HasFired() {
-		return constants.ErrReporterClosed
+		return ErrReporterClosed
 	}
 
 	cnt := p.countReportersMap[metric]
@@ -240,14 +240,14 @@ func (p *PrometheusReporter) ReportCount(metric string, labels map[string]string
 		cnt.With(labels).Add(count)
 		return nil
 	}
-	return constants.ErrMetricNotKnown
+	return ErrMetricNotKnown
 }
 
 // ReportGauge reports a gauge metric
 func (p *PrometheusReporter) ReportGauge(metric string, labels map[string]string, value float64) error {
 
 	if p.closeEvent.HasFired() {
-		return constants.ErrReporterClosed
+		return ErrReporterClosed
 	}
 
 	g := p.gaugeReportersMap[metric]
@@ -256,14 +256,14 @@ func (p *PrometheusReporter) ReportGauge(metric string, labels map[string]string
 		g.With(labels).Set(value)
 		return nil
 	}
-	return constants.ErrMetricNotKnown
+	return ErrMetricNotKnown
 }
 
 // ReportGaugeInc reports a gauge metric
 func (p *PrometheusReporter) ReportGaugeInc(metric string, labels map[string]string) error {
 
 	if p.closeEvent.HasFired() {
-		return constants.ErrReporterClosed
+		return ErrReporterClosed
 	}
 
 	g := p.gaugeReportersMap[metric]
@@ -272,14 +272,14 @@ func (p *PrometheusReporter) ReportGaugeInc(metric string, labels map[string]str
 		g.With(labels).Inc()
 		return nil
 	}
-	return constants.ErrMetricNotKnown
+	return ErrMetricNotKnown
 }
 
 // ReportGaugeDec reports a gauge metric
 func (p *PrometheusReporter) ReportGaugeDec(metric string, labels map[string]string) error {
 
 	if p.closeEvent.HasFired() {
-		return constants.ErrReporterClosed
+		return ErrReporterClosed
 	}
 
 	g := p.gaugeReportersMap[metric]
@@ -288,7 +288,7 @@ func (p *PrometheusReporter) ReportGaugeDec(metric string, labels map[string]str
 		g.With(labels).Dec()
 		return nil
 	}
-	return constants.ErrMetricNotKnown
+	return ErrMetricNotKnown
 }
 
 // ensureLabels checks if labels contains the additionalLabels values,

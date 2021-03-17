@@ -11,6 +11,7 @@ import (
 	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/textlog"
 	"github.com/olivere/elastic/v7"
+	"google.golang.org/protobuf/proto"
 
 	//json编码
 	_ "github.com/liyiysng/scatter/encoding/json"
@@ -21,6 +22,8 @@ import (
 	//snappy压缩
 	_ "github.com/liyiysng/scatter/encoding/snappy"
 )
+
+var typeProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
 
 const (
 	defaultWriteBufSize = 32 * 1024
@@ -109,6 +112,9 @@ type Options struct {
 
 	// 配置错误
 	lastError error
+
+	// 节点停止之后执行
+	afterStop []func()
 }
 
 func (o *Options) validate() error {
@@ -170,10 +176,20 @@ var defaultOptions = Options{
 	enableLimit:       false,
 	enableTraceDetail: true,
 	showHandleLog:     true,
-	reqTypeValidator:  func(reqType reflect.Type) error { return nil },
-	resTypeValidator:  func(reqType reflect.Type) error { return nil },
-	readChanBufSize:   1024,
-	writeChanBufSize:  1024,
+	reqTypeValidator: func(reqType reflect.Type) error {
+		if reqType.Implements(typeProtoMessage) {
+			return nil
+		}
+		return handle.ErrRequstTypeError
+	},
+	resTypeValidator: func(reqType reflect.Type) error {
+		if reqType.Implements(typeProtoMessage) {
+			return nil
+		}
+		return handle.ErrResponseTypeError
+	},
+	readChanBufSize:  1024,
+	writeChanBufSize: 1024,
 }
 
 // IOption 设置 日志等级等....
@@ -332,5 +348,15 @@ func NOptProcMsgNumRateLimit(num int64) IOption {
 			return
 		}
 		o.rateLimitMsgProcNum = num
+	})
+}
+
+// NOptAfterStop 当节点停止后调用
+func NOptAfterStop(f ...func()) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.afterStop = append(o.afterStop, f...)
 	})
 }

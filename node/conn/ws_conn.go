@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/ratelimit"
 	"github.com/liyiysng/scatter/util"
@@ -115,7 +114,7 @@ func (c *wsConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) e
 		return err
 	}
 	if len(buf) > c.opt.MaxLength {
-		return constants.ErrMsgTooLager
+		return message.ErrMsgTooLager
 	}
 	p := message.PackagePoolGet()
 	defer message.PackagePoolPut(p)

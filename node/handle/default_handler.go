@@ -10,6 +10,13 @@ import (
 	"github.com/liyiysng/scatter/encoding"
 )
 
+var (
+	// ErrRequstTypeError 服务请求参数类型错误
+	ErrRequstTypeError = errors.New("handle: service request argument type error")
+	// ErrResponseTypeError 服务回复参数类型错误
+	ErrResponseTypeError = errors.New("handle: service response argument type error")
+)
+
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 var typeOfContext = reflect.TypeOf((*context.Context)(nil)).Elem()
 
