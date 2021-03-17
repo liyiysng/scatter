@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/liyiysng/scatter/cluster/selector/policy"
 	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/logger"
@@ -53,6 +55,8 @@ type Option struct {
 	// 2.wirteChan数量为0
 	// session 会接连发送[1,MaxMsgCacheNum]条消息到bufio中
 	MaxMsgCacheNum int
+	// kick timeout ,剔出超时
+	KickTimeout time.Duration
 }
 
 type msgCtx struct {
@@ -146,17 +150,25 @@ type frontendSession struct {
 	onClose OnClose
 	mu      sync.Mutex
 
+	// session context
+	ctx                 context.Context
+	concel              context.CancelFunc
+	sessionAffinityData interface{}
+
 	// 握手数据
 	handShake interface{}
 
 	// 上次心跳时间
 	lastHeartBeat time.Time
 
+	attrs  map[string]interface{}
+	attrMu sync.Mutex
+
 	wg util.WaitGroupWrapper
 }
 
 // NewFrontendSession 创建一个session
-func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession {
+func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession {
 	ret := &frontendSession{
 		nid:        nid,
 		conn:       c,
@@ -164,7 +176,16 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession 
 		readChan:   make(chan *msgCtx, opt.ReadChanSize),
 		writeChan:  make(chan *msgCtx, opt.WriteChanSize),
 		closeEvent: util.NewEvent(),
+		ctx:        context.Background(),
+		attrs:      make(map[string]interface{}),
 	}
+	ret.ctx, ret.concel = context.WithCancel(ret.ctx)
+	// session_affinity support
+	ret.ctx = policy.WithSessionAffinity(ret.ctx, func(data interface{}) {
+		ret.sessionAffinityData = data
+	}, func() (conn interface{}) {
+		return ret.sessionAffinityData
+	})
 
 	if ret.opt.RateLimitMsgProc > 0 {
 		ret.rateLimt = ratelimit.NewBucketWithQuantum(time.Second, ret.opt.RateLimitMsgProc, ret.opt.RateLimitMsgProc)
@@ -178,6 +199,23 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) FrontendSession 
 	return ret
 }
 
+func (s *frontendSession) SetAttr(key string, v interface{}) {
+	s.attrMu.Lock()
+	defer s.attrMu.Unlock()
+	s.attrs[key] = v
+}
+
+func (s *frontendSession) GetAttr(key string) (v interface{}, ok bool) {
+	s.attrMu.Lock()
+	defer s.attrMu.Unlock()
+	v, ok = s.attrs[key]
+	return
+}
+
+func (s *frontendSession) GetCtx() context.Context {
+	return s.ctx
+}
+
 func (s *frontendSession) GetSID() int64 {
 	return s.conn.GetSID()
 }
@@ -186,8 +224,8 @@ func (s *frontendSession) GetNID() int64 {
 	return s.nid
 }
 
-func (s *frontendSession) PeerAddr() string {
-	return s.conn.RemoteAddr().String()
+func (s *frontendSession) PeerAddr() net.Addr {
+	return s.conn.RemoteAddr()
 }
 
 func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
@@ -370,7 +408,7 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 	}
 }
 
-func (s *frontendSession) OnClose(onClose OnClose) {
+func (s *frontendSession) SetOnClose(onClose OnClose) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onClose = onClose
@@ -378,6 +416,24 @@ func (s *frontendSession) OnClose(onClose OnClose) {
 
 func (s *frontendSession) Closed() bool {
 	return s.closeEvent.HasFired()
+}
+
+func (s *frontendSession) Kick() error {
+	if s.closeEvent.HasFired() {
+		return constants.ErrSessionClosed
+	}
+
+	mctx := getMsgCtx(s.opt.EnableTraceDetail, message.DEFAULTPOPT)
+
+	var err error
+	mctx.msgWrite, err = message.MsgFactory.BuildKickMessage()
+	if err != nil {
+		return err
+	}
+
+	mctx.WithTimeout(s.opt.KickTimeout)
+
+	return s.push(mctx)
 }
 
 // Close 关闭session 可多次调用
@@ -409,6 +465,7 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 		// 读写协程都结束
 		s.wg.Wait()
 
+		////////////////////////////////close routine/////////////////////////////////
 		// copy onClose
 		var onClose OnClose
 		s.mu.Lock()
@@ -418,6 +475,9 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 		if onClose != nil {
 			onClose(s)
 		}
+
+		// cancel context
+		s.concel()
 	}()
 
 	defer func() {
@@ -461,10 +521,14 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 						return
 					} else if customErr, ok := err.(handle.ICustomError); ok {
 						// 非关键错误
-						s.opt.Logger.Warningf("handle message encount custom error %v", customErr)
+						if s.opt.Logger.V(logger.VDEBUG) {
+							s.opt.Logger.Warningf("handle message encount custom error %v", customErr)
+						}
 					} else {
 						s.finishMsg(mctx, cErr)
-						s.opt.Logger.Errorf("handle message encount a error %v", err)
+						if s.opt.Logger.V(logger.VDEBUG) {
+							s.opt.Logger.Warningf("handle message encount a error %v", err)
+						}
 						return
 					}
 				}
@@ -697,7 +761,7 @@ func (s *frontendSession) runWrite() {
 
 	cacheMsgNum := 0
 	// 退出写协程条件:
-	// 1.resChan关闭
+	// 1.writeChan关闭
 	// 2.conn写消息错误
 	// 3.关闭事件
 	for {
@@ -794,7 +858,7 @@ func (s *frontendSession) runRead() {
 
 	// 退出读协程条件:
 	// 1.关闭事件
-	// 2.conn读取消息错误,一半为EOF
+	// 2.conn读取消息错误,一般为EOF
 	// 3.链接已关闭
 	for {
 

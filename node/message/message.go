@@ -53,8 +53,10 @@ type Factor interface {
 	BuildHandShakeAckMessage() (msg Message, err error)
 	// BuildResponseMessage 创建一个回复
 	BuildResponseMessage(sequence int32, srv string, payload []byte) (msg Message, err error)
-	//BuildResponseCustomErrorMessage 创建一个自定义错误回复
+	// BuildResponseCustomErrorMessage 创建一个自定义错误回复
 	BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error)
+	// BuildKickMessage 创建一个踢出消息
+	BuildKickMessage() (msg Message, err error)
 
 	// ParseHandShake 解析握手数据
 	ParseHandShake(buf []byte) (h interface{}, err error)

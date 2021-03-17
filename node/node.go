@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,7 +55,7 @@ type Node struct {
 	startTime time.Time
 
 	// 所有链接
-	sessions map[int64]session.FrontendSession
+	sessions map[int64]session.Session
 
 	// 监听对象
 	accs map[acceptor.Acceptor]bool
@@ -110,7 +111,7 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		accs:      make(map[acceptor.Acceptor]bool),
 		opts:      opts,
 		startTime: time.Now(),
-		sessions:  make(map[int64]session.FrontendSession),
+		sessions:  make(map[int64]session.Session),
 		quit:      util.NewEvent(),
 		gnode:     cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10), cluster.OptWithLogger(opts.Logger)),
 	}
@@ -301,8 +302,8 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 			n.mu.Lock()
 			n.trEventLogf("[Node.Serve] done serve protcol:%s addr %s", sp, addr)
 			n.mu.Unlock()
-			if err != nil {
-				n.opts.Logger.Errorf("[Node.Serve] node %v stop %v", n.opts.ID, err)
+			if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+				n.opts.Logger.Errorf("[Node.Serve] node %v stoped cause by %v", n.opts.ID, err)
 			}
 		}, n.opts.Logger.Errorf)
 
@@ -429,6 +430,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		EnableTraceDetail: n.opts.enableTraceDetail,
 		KeepAlive:         time.Minute * 5,
 		MaxMsgCacheNum:    3,
+		KickTimeout:       time.Second,
 	})
 
 	if n.opts.Logger.V(logger.VDEBUG) {

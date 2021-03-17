@@ -60,14 +60,14 @@ func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Pick
 			myLog.Errorf("[consistentHashBuilder.Build] attributes not fount")
 			continue
 		}
-		srvID := v.Address.Attributes.Value("serviceID")
-		if srvID == nil {
-			myLog.Errorf("[consistentHashBuilder.Build] attributes serviceID not fount")
+		nodeID := v.Address.Attributes.Value("nodeID")
+		if nodeID == nil {
+			myLog.Errorf("[consistentHashBuilder.Build] attributes nodeID not fount")
 			continue
 		}
-		strSrvID := srvID.(string)
-		subConns[strSrvID] = k
-		consistent.Add(strSrvID)
+		strNodeID := nodeID.(string)
+		subConns[strNodeID] = k
+		consistent.Add(strNodeID)
 	}
 
 	return &consistentHashPicker{

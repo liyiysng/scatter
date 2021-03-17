@@ -3,6 +3,7 @@ package session
 
 import (
 	"context"
+	"net"
 	"time"
 
 	"github.com/liyiysng/scatter/logger"
@@ -14,19 +15,21 @@ var (
 	myLog = logger.Component("session")
 )
 
-// State 表示session当前状态
-type State struct {
-	SID           int64  `json:"sid"`
-	NID           int64  `json:"nid"`
-	RemoteAddress string `json:"remote_address"`
-}
-
 // OnClose 关闭回调类型
 type OnClose func(s Session)
 
+// ISessionInfo session信息
+type ISessionInfo interface {
+	GetSID() int64
+	// GetNID 节点ID
+	GetNID() int64
+	// PeerAddr 对端地址
+	PeerAddr() net.Addr
+}
+
 // Session 表示一个客户端,可能是TCP/UDP/ws(s)/http(s) 的一次会话
 type Session interface {
-	GetSID() int64
+	ISessionInfo
 	// 向客户端推送消息
 	Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 向客户端推送消息
@@ -34,20 +37,25 @@ type Session interface {
 	// 向客户端推送,若发送缓冲已满则会返回 ErrorPushBufferFull
 	PushImmediately(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 关闭回调
-	OnClose(onClose OnClose)
+	SetOnClose(onClose OnClose)
 	// session是否关闭
 	Closed() bool
+	// Kick 提出 , 防止服务器出现过多TIME_WAIT状态,使用Kick断开链接
+	Kick() error
+	// 关闭session , 强制关闭session , 服务器主动断开链接
+	Close()
+
+	// context
+	GetCtx() context.Context
+
+	// attr 元数据
+	SetAttr(key string, v interface{})
+	GetAttr(key string) (v interface{}, ok bool)
 }
 
-// FrontendSession 前端Session
-type FrontendSession interface {
+// IFrontendSession 前端session
+type IFrontendSession interface {
 	Session
-	// GetNID 节点ID
-	GetNID() int64
-	// PeerAddr 对端地址
-	PeerAddr() string
 	// 消息处理
 	Handle(srvHandler handle.IHandler)
-	// 关闭session
-	Close()
 }

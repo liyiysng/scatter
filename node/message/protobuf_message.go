@@ -60,6 +60,16 @@ func (f *protoBufFactory) BuildPushMessage(cmd string, data []byte) (msg Message
 	return
 }
 
+// BuildKickMessage 创建一个踢出消息
+func (f *protoBufFactory) BuildKickMessage() (msg Message, err error) {
+	msg = &ProtobufMsg{
+		Head: phead.Head{
+			MsgType: phead.MsgType_KICK,
+		},
+	}
+	return
+}
+
 // BuildHeatAckMessage 创建一个心跳回复 Message
 func (f *protoBufFactory) BuildHeatAckMessage() (msg Message, err error) {
 	msg = &ProtobufMsg{
