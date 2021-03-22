@@ -68,8 +68,8 @@ type INodeRegister interface {
 
 // INodeServe node 服务器
 type INodeServe interface {
-	// RunGrpc 运行grpc服务,阻塞函数,一般运行在单独的goroutine
-	RunGrpc(lis net.Listener) error
+	// Serve 运行grpc服务,阻塞函数,一般运行在单独的goroutine
+	ServeGrpc(lis net.Listener) error
 	// Serve 启动一个前端Serve,阻塞函数,一般运行在单独的goroutine
 	// Serve 除Stop或者 被调用之外,都返回一个非nil错误
 	// arg[0] = certfile
@@ -84,6 +84,10 @@ type INodeServe interface {
 type INodeGrpcClient interface {
 	// GetGrpcClient 根据服务名获得客户端
 	GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err error)
+}
+
+// INode 节点
+type INode interface {
 }
 
 // Node represent
@@ -237,8 +241,8 @@ func (n *Node) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
 	n.gnode.RegisterService(desc, impl)
 }
 
-// RunGrpc run grpc server
-func (n *Node) RunGrpc(lis net.Listener) error {
+// ServeGrpc run grpc server
+func (n *Node) ServeGrpc(lis net.Listener) error {
 	n.waitGroup.Add(1)
 	defer n.waitGroup.Done()
 
