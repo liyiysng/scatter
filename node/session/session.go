@@ -61,6 +61,14 @@ type Session interface {
 	// attr 元数据
 	SetAttr(key string, v interface{})
 	GetAttr(key string) (v interface{}, ok bool)
+
+	// uid
+	//!
+	GetUID() interface{}
+	//!
+	BindUID(uid interface{})
+	//!
+	IsUIDBind() bool
 }
 
 // IFrontendSession 前端session

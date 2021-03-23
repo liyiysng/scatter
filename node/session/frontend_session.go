@@ -131,6 +131,8 @@ func putMsgCtx(mctx *msgCtx) {
 type frontendSession struct {
 	nid int64
 
+	uid interface{}
+
 	opt *Option
 
 	rateLimt *ratelimit.Bucket
@@ -196,6 +198,20 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession
 	ret.wg.Wrap(ret.runWrite, ret.opt.Logger.Errorf)
 
 	return ret
+}
+
+func (s *frontendSession) GetUID() interface{} {
+	return s.uid
+}
+
+func (s *frontendSession) BindUID(uid interface{}) {
+	s.uid = uid
+	strUID := fmt.Sprintf("%v", uid)
+	s.ctx = policy.WithConsistentHashID(s.ctx, strUID)
+}
+
+func (s *frontendSession) IsUIDBind() bool {
+	return s.uid != nil
 }
 
 func (s *frontendSession) SetAttr(key string, v interface{}) {
