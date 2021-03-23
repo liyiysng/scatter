@@ -34,7 +34,7 @@ const (
 // 用于服务调用
 type IGrpcClient interface {
 	// GetGrpcClient 根据服务名获得客户端
-	GetGrpcClient(srvName string, opts ...IGetClientOption) (c grpc.ClientConnInterface, err error)
+	GetClient(srvName string, opts ...IGetClientOption) (c grpc.ClientConnInterface, err error)
 }
 
 // IGrpcSubSrvClient 用于服务调用
