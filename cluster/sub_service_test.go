@@ -70,12 +70,14 @@ func TestSubService(t *testing.T) {
 
 	myLog.Info("---------------------------------begin dial----------------------------------")
 
-	client, err := n1.GetSubSrvClient("foo")
+	clientBuild := NewGrpcClient()
+
+	client, err := clientBuild.GetSubSrvClient("foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client1, err := n1.GetSubSrvClient("foo1")
+	client1, err := clientBuild.GetSubSrvClient("foo1")
 	if err != nil {
 		t.Fatal(err)
 	}

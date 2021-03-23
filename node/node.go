@@ -85,13 +85,6 @@ type INodeServe interface {
 	Stop()
 }
 
-// INodeGrpcClient node 的客户端
-// 用于服务调用
-type INodeGrpcClient interface {
-	// GetGrpcClient 根据服务名获得客户端
-	GetGrpcClient(srvName string, opts ...cluster.IGetClientOption) (c grpc.ClientConnInterface, err error)
-}
-
 // Node represent
 type Node struct {
 	mu sync.RWMutex
@@ -179,7 +172,9 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
 		HookCall:         n.onCall,
 		HookNofify:       n.onNotify,
-	}), n.gnode, n.opts.subSrvValidator)
+	}),
+		cluster.NewGrpcClient(cluster.OptGrpcClientWithLogger(n.opts.Logger)),
+		n.opts.subSrvValidator)
 
 	if opts.enableEventTrace {
 		_, file, line, _ := runtime.Caller(1)
@@ -227,18 +222,6 @@ func (n *Node) RegisterSubService(recv interface{}) error {
 
 func (n *Node) RegisterSubServiceName(name string, recv interface{}) error {
 	return n.gnode.RegisterSubServiceName(name, recv)
-}
-
-// GetGrpcClient 获取grpc client
-func (n *Node) GetGrpcClient(srvName string, opts ...cluster.IGetClientOption) (c grpc.ClientConnInterface, err error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.gnode == nil {
-		return nil, ErrNodeStopped
-	}
-
-	return n.gnode.GetClient(srvName)
 }
 
 // RegisterService implement grpc.ServiceRegistrar

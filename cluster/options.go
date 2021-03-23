@@ -164,3 +164,45 @@ func GetClientOptWithPolicy(p string) IGetClientOption {
 		gco.policy = p
 	})
 }
+
+// grpc client opt
+type GrpcClientOpt struct {
+	// 日志
+	logerr logger.Logger
+
+	// 配置
+	cfg *config.Config
+}
+
+// IGrpcClientOpt 客户端选项
+type IGrpcClientOption interface {
+	apply(*GrpcClientOpt)
+}
+
+type funcGrpcClientOption struct {
+	f func(*GrpcClientOpt)
+}
+
+func (fdo *funcGrpcClientOption) apply(do *GrpcClientOpt) {
+	fdo.f(do)
+}
+
+func newFuncGrpcClientOption(f func(*GrpcClientOpt)) IGrpcClientOption {
+	return &funcGrpcClientOption{
+		f: f,
+	}
+}
+
+// OptGrpcClientWithLogger logger 选项
+func OptGrpcClientWithLogger(logerr logger.Logger) IGrpcClientOption {
+	return newFuncGrpcClientOption(func(gco *GrpcClientOpt) {
+		gco.logerr = logerr
+	})
+}
+
+// OptGrpcClientWithCfg 配置 选项
+func OptGrpcClientWithCfg(cfg *config.Config) IGrpcClientOption {
+	return newFuncGrpcClientOption(func(gco *GrpcClientOpt) {
+		gco.cfg = cfg
+	})
+}

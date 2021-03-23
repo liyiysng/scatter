@@ -168,12 +168,14 @@ func TestGrpcNodeClient(t *testing.T) {
 
 	myLog.Info("---------------------------------begin dial----------------------------------")
 
-	client, err := n1.GetClient("scatter.service.SrvStrings")
+	clientBuild := NewGrpcClient()
+
+	client, err := clientBuild.GetClient("scatter.service.SrvStrings")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	iClient, err := n1.GetClient("scatter.service.SrvInts")
+	iClient, err := clientBuild.GetClient("scatter.service.SrvInts")
 	if err != nil {
 		t.Fatal(err)
 	}

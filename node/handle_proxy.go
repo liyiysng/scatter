@@ -16,13 +16,13 @@ type srvHanleProxy struct {
 	innerHandle handle.IHandler
 	supportSrvs map[string]struct{}
 
-	clientBuild  cluster.INodeSubSrvClient
+	clientBuild  cluster.IGrpcSubSrvClient
 	cmu          sync.Mutex
 	clients      map[string] /*srv name*/ subsrvpb.SubServiceClient
 	srvValidator func(srvName string) bool
 }
 
-func newSrvHandleProxy(innerHandle handle.IHandler, clientBuild cluster.INodeSubSrvClient, srvValidator func(srvName string) bool) *srvHanleProxy {
+func newSrvHandleProxy(innerHandle handle.IHandler, clientBuild cluster.IGrpcSubSrvClient, srvValidator func(srvName string) bool) *srvHanleProxy {
 	return &srvHanleProxy{
 		innerHandle:  innerHandle,
 		supportSrvs:  map[string]struct{}{},
