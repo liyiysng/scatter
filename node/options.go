@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/encoding"
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
-	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/textlog"
 	"github.com/olivere/elastic/v7"
 	"google.golang.org/protobuf/proto"
@@ -115,6 +115,9 @@ type Options struct {
 
 	// 节点停止之后执行
 	afterStop []func()
+
+	// sub servive validator
+	subSrvValidator func(srvName string) bool
 }
 
 func (o *Options) validate() error {
@@ -190,6 +193,7 @@ var defaultOptions = Options{
 	},
 	readChanBufSize:  1024,
 	writeChanBufSize: 1024,
+	subSrvValidator:  func(srvName string) bool { return true },
 }
 
 // IOption 设置 日志等级等....
@@ -358,5 +362,15 @@ func NOptAfterStop(f ...func()) IOption {
 			return
 		}
 		o.afterStop = append(o.afterStop, f...)
+	})
+}
+
+// NOptWithSubSrvValidator 子服务验证
+func NOptWithSubSrvValidator(f func(srvName string) bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.subSrvValidator = f
 	})
 }

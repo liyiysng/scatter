@@ -10,6 +10,8 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/selector"
+	"github.com/liyiysng/scatter/cluster/subsrv"
+	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"github.com/liyiysng/scatter/config"
 
 	// consul服务注册
@@ -28,6 +30,12 @@ const (
 	_selectPolicyKey = "select_policy"
 )
 
+// INodeSubSrvClient sub server 客户端
+type INodeSubSrvClient interface {
+	// GetSubSrvClient 更具子服务名获取客户端
+	GetSubSrvClient(name string, opts ...IGetClientOption) (c subsrvpb.SubServiceClient, err error)
+}
+
 // GrpcNode grpc服务器
 type GrpcNode struct {
 	*grpc.Server
@@ -36,6 +44,17 @@ type GrpcNode struct {
 
 	clientMu sync.Mutex
 	clients  map[string] /*srvice name*/ *grpc.ClientConn
+
+	// 子服务处理
+	subSrv *subsrv.SubServiceImp
+}
+
+func (s *GrpcNode) RegisterSubService(recv interface{}) error {
+	return s.subSrv.SubSrvHandle.Register(recv)
+}
+
+func (s *GrpcNode) RegisterSubServiceName(name string, recv interface{}) error {
+	return s.subSrv.SubSrvHandle.RegisterName(name, recv)
 }
 
 // Serve 开始服务
@@ -45,6 +64,9 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 	healthgrpc.RegisterHealthServer(s, s.healthSrv)
 	s.healthSrv.SetServingStatus("service_health", healthgrpc.HealthCheckResponse_SERVING)
 	defer s.healthSrv.Shutdown()
+
+	// 注册子服务
+	subsrvpb.RegisterSubServiceServer(s, s.subSrv)
 
 	// 开始注册服务
 	srvNeedRegister, err := s.getSrvNeedRegister(lis.Addr().String())
@@ -94,6 +116,13 @@ func (s *GrpcNode) getSrvNeedRegister(addr string) ([]*registry.Service, error) 
 		if !s.opts.registryFillter(k) {
 			continue
 		}
+
+		// copy meta
+		meta := map[string]string{}
+		for k, v := range s.opts.nodeMeta {
+			meta[k] = v
+		}
+
 		// 初始信息
 		srv := &registry.Service{
 			Name:    k,
@@ -102,31 +131,29 @@ func (s *GrpcNode) getSrvNeedRegister(addr string) ([]*registry.Service, error) 
 				{
 					SrvNodeID: selector.GetServiceID(s.opts.id, k),
 					Address:   addr,
-					Metadata:  s.opts.nodeMeta,
+					Metadata:  meta,
 				},
 			},
 			Metadata: map[string]string{},
 		}
 
-		// 设置服务元数据 和 选择策略
+		if k == subsrv.SubSrvGrpcName { // 包含子服务
+			subsrv.SetSubSrvToMeta(s.subSrv.SubSrvHandle.AllServiceName(), srv.Nodes[0].Metadata)
+		}
+
+		// 设置服务元数据
 		srvName := strings.ToLower(k)
 		var srvCfg *config.Service
 		err := s.opts.cfg.UnmarshalKey(srvName, &srvCfg)
 		if err != nil {
 			return nil, err
 		}
-		selectPolic := selector.DefaultPolicy
 		if srvCfg != nil {
 			// copy
 			for ksc, vsc := range srvCfg.Meta {
 				srv.Metadata[ksc] = vsc
 			}
-			// 设置选择策略
-			if srvCfg.SelectPolicy != "" {
-				selectPolic = srvCfg.SelectPolicy
-			}
 		}
-		srv.Metadata[_selectPolicyKey] = selectPolic
 
 		// endpoints 元数据
 		if s.opts.endpointMetas != nil {
@@ -161,16 +188,42 @@ func (s *GrpcNode) closeAllClients() {
 	s.clients = make(map[string]*grpc.ClientConn)
 }
 
-// GetClient 获取grpc客户端链接
-func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err error) {
-	s.clientMu.Lock()
-	defer s.clientMu.Unlock()
+func (s *GrpcNode) GetSubSrvClient(name string, opts ...IGetClientOption) (c subsrvpb.SubServiceClient, err error) {
 
-	if gc, ok := s.clients[srvName]; ok {
-		return gc, nil
+	opt := defaultGetClientOption
+	for _, v := range opts {
+		v.apply(&opt)
 	}
 
-	// 创建链接并保存
+	policy := selector.DefaultPolicy
+
+	if opt.policy != "" { // 优先从选项中获取
+		policy = opt.policy
+	} else { // 从配置中获取
+		var subSrvCfg *config.SubService
+		err = s.opts.cfg.UnmarshalKey("scatter.subservice."+strings.ToLower(name), &subSrvCfg)
+		if err != nil {
+			return
+		}
+		if subSrvCfg != nil && subSrvCfg.SelectPolicy != "" {
+			policy = subSrvCfg.SelectPolicy
+		}
+	}
+
+	conn, err := s.dail(subsrv.SubSrvGrpcName, GetClientOptWithSubService(name), GetClientOptWithPolicy(policy))
+	if err != nil {
+		return nil, err
+	}
+	return subsrvpb.NewSubServiceClient(conn), nil
+}
+
+func (s *GrpcNode) dail(srvName string, opts ...IGetClientOption) (c *grpc.ClientConn, err error) {
+	opt := defaultGetClientOption
+	for _, v := range opts {
+		v.apply(&opt)
+	}
+
+	// 创建链接
 	ctx := context.Background()
 	dialOpts := []grpc.DialOption{}
 
@@ -187,19 +240,25 @@ func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err er
 		defer cancel()
 	}
 
-	// 服务配置
-	var srvCfg *config.Service
-	err = s.opts.cfg.UnmarshalKey(strings.ToLower(srvName), &srvCfg)
-	if err != nil {
-		return nil, err
-	}
+	// 优先从选项中获取策略
 	policy := selector.DefaultPolicy
-	if srvCfg != nil {
-		if srvCfg.SelectPolicy != "" {
-			policy = srvCfg.SelectPolicy
+	if opt.policy != "" {
+		policy = opt.policy
+	} else { // 从服务配置中获取策略
+		var srvCfg *config.Service
+		err = s.opts.cfg.UnmarshalKey(strings.ToLower(srvName), &srvCfg)
+		if err != nil {
+			return nil, err
+		}
+
+		if srvCfg != nil {
+			if srvCfg.SelectPolicy != "" {
+				policy = srvCfg.SelectPolicy
+			}
 		}
 	}
-	myLog.Infof("cfg %v , srvName[%s] use policy [%s]", srvCfg, strings.ToLower(srvName), policy)
+
+	myLog.Infof("srvName[%s] use policy [%s]", strings.ToLower(srvName), policy)
 	strCfg := fmt.Sprintf(
 		`
 		{
@@ -210,11 +269,28 @@ func (s *GrpcNode) GetClient(srvName string) (c grpc.ClientConnInterface, err er
 
 	conn, err := grpc.DialContext(
 		ctx,
-		fmt.Sprintf("scatter://%s/%s", s.opts.id, srvName),
+		fmt.Sprintf("scatter://%s/%s", opt.subSrv, srvName),
 		dialOpts...,
 	)
 	if err != nil {
 		return
+	}
+
+	return conn, nil
+}
+
+// GetClient 获取grpc客户端链接
+func (s *GrpcNode) GetClient(srvName string, opts ...IGetClientOption) (c grpc.ClientConnInterface, err error) {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+
+	if gc, ok := s.clients[srvName]; ok {
+		return gc, nil
+	}
+
+	conn, err := s.dail(srvName, opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	s.clients[srvName] = conn
@@ -241,10 +317,13 @@ func NewGrpcNode(id string, o ...IOption) *GrpcNode {
 		opts.logerr = logger.NewPrefixLogger(myLog, fmt.Sprintf("node %s:", id))
 	}
 
-	return &GrpcNode{
+	n := &GrpcNode{
 		Server:    grpc.NewServer(opts.grpcOpts...),
 		opts:      &opts,
 		healthSrv: health.NewServer(),
 		clients:   make(map[string]*grpc.ClientConn),
+		subSrv:    subsrv.NewSubServiceImp(opts.getCodec(), opts.callHook, opts.notifyHook),
 	}
+
+	return n
 }

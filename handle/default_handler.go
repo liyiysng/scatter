@@ -64,6 +64,19 @@ type OptionalArgs struct {
 	Call              func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error
 }
 
+type CallHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error
+type NotifyHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error
+
+var DefaultCallHook = func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
+	_, err := callee(req)
+	return err
+}
+
+var DefaultNotifyHook = func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {
+	err := callee(req)
+	return err
+}
+
 // Option handle 选项设置
 type Option struct {
 	Codec            encoding.Codec
@@ -73,8 +86,8 @@ type Option struct {
 
 	OptArgs *OptionalArgs
 
-	HookCall   func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error
-	HookNofify func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error
+	HookCall   CallHookType
+	HookNofify NotifyHookType
 }
 
 type serviceHandler struct {
@@ -94,6 +107,14 @@ func NewServiceHandle(opt *Option) IHandler {
 		Option:     opt,
 		serviceMap: make(map[string]*service),
 	}
+}
+
+func (s *serviceHandler) AllServiceName() []string {
+	ret := []string{}
+	for k := range s.serviceMap {
+		ret = append(ret, k)
+	}
+	return ret
 }
 
 func (s *serviceHandler) Register(recv interface{}) error {

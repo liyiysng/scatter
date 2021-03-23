@@ -1,11 +1,9 @@
 package selector
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/cluster/registry/publisher"
+	"github.com/liyiysng/scatter/cluster/subsrv"
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
 )
@@ -15,38 +13,41 @@ func init() {
 	resolver.Register(&discoverResolverBuilder{})
 }
 
-// GetServiceID 获取serviceID
-func GetServiceID(nodeID string, srvName string) string {
-	return fmt.Sprintf("%s/%s", nodeID, srvName)
-}
-
-// GetServiceNameAndNodeID 根据 service ID 获取service name 和 nodeID
-func GetServiceNameAndNodeID(srvID string) (nodeID string, srvName string, err error) {
-	srvAndID := strings.Split(srvID, "/")
-	if len(srvAndID) != 2 {
-		return "", "", fmt.Errorf("invalid format service id %s", srvID)
-	}
-	return srvAndID[0], srvAndID[1], nil
-}
-
 type discoverResolverBuilder struct {
 }
 
 // target.Scheme	:	scatter
-// target.Authority	:	nodeID
+// target.Authority	:	sub service
 // target.Endpoint	:	serviceName
 func (d *discoverResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 
 	myLog.Info("[discoverResolverBuilder.Build] build target ", target)
 
 	serviceName := target.Endpoint
+	subSrv := target.Authority
 
 	ret := &discoverResolver{
 		cc: cc,
-		sub: publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool {
+		sub: publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool { // 需要订阅的节点
+			if serviceName == subsrv.SubSrvGrpcName { // 子服务
+				hsrvs, err := subsrv.GetSubSrvFromMeta(node.Metadata)
+				if err != nil {
+					myLog.Errorf("node meta error %v", err)
+					return false
+				}
+				found := false
+				for _, v := range hsrvs {
+					if v == subSrv {
+						found = true
+						break
+					}
+				}
+				return found
+			}
 			return srvName == serviceName // 所有该服务的节点
 		}),
 		srvName: serviceName,
+		subSrv:  subSrv,
 	}
 
 	ret.run()
@@ -63,10 +64,26 @@ type discoverResolver struct {
 	cc      resolver.ClientConn
 	sub     chan interface{}
 	srvName string
+	subSrv  string
 }
 
 func (r *discoverResolver) updateCC() {
 	nodes := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
+		if r.srvName == subsrv.SubSrvGrpcName { // 子服务
+			hsrvs, err := subsrv.GetSubSrvFromMeta(node.Metadata)
+			if err != nil {
+				myLog.Errorf("node meta error %v", err)
+				return false
+			}
+			found := false
+			for _, v := range hsrvs {
+				if v == r.subSrv {
+					found = true
+					break
+				}
+			}
+			return found
+		}
 		return r.srvName == srv.Name // 所有该服务的节点
 	})
 
@@ -80,7 +97,7 @@ func (r *discoverResolver) updateCC() {
 		}
 		addrs = append(addrs, resolver.Address{
 			Addr:       n.Address,
-			Attributes: attributes.New("serviceID", n.SrvNodeID, "srvName", r.srvName, "nodeID", nid, "meta", n.Metadata),
+			Attributes: attributes.New(AttrKeyServiceID, n.SrvNodeID, AttrKeyServiceName, r.srvName, AttrKeyNodeID, nid, AttrKeyMeta, n.Metadata),
 		})
 	}
 

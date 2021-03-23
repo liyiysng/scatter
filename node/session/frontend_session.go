@@ -12,9 +12,9 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/selector/policy"
 	"github.com/liyiysng/scatter/encoding"
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/conn"
-	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
 	phead "github.com/liyiysng/scatter/node/message/proto"
 	"github.com/liyiysng/scatter/ratelimit"
@@ -33,7 +33,7 @@ type Option struct {
 	// <=0 不受限制
 	RateLimitMsgProc int64
 	// push拦截
-	PushInterceptor handle.SerrvicePushInterceptor
+	PushInterceptor SerrvicePushInterceptor
 	// 编码
 	Codec encoding.Codec
 	// 当消息完成

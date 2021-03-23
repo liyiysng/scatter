@@ -5,8 +5,20 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/config"
+
+	//json编码
+	_ "github.com/liyiysng/scatter/encoding/json"
+	//proto编码
+	_ "github.com/liyiysng/scatter/encoding/proto"
+
+	"github.com/liyiysng/scatter/encoding"
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc"
+)
+
+const (
+	NoneSubService = "none"
 )
 
 // Options grpc server 选项
@@ -32,10 +44,28 @@ type Options struct {
 
 	// 配置
 	cfg *config.Config
+
+	// 编码
+	codec string
+
+	// sub service hook
+	callHook   handle.CallHookType
+	notifyHook handle.NotifyHookType
 }
 
 var defaultOptions = Options{
 	registryFillter: func(srvName string) bool { return !strings.Contains(srvName, "grpc.health") }, // 跳过健康服务注册
+	codec:           "proto",
+	callHook:        handle.DefaultCallHook,
+	notifyHook:      handle.DefaultNotifyHook,
+	nodeMeta:        map[string]string{},
+}
+
+func (o *Options) getCodec() encoding.Codec {
+	if o.codec != "" {
+		return encoding.GetCodec(o.codec)
+	}
+	return encoding.GetCodec("proto")
 }
 
 // IOption 服务器选项
@@ -75,5 +105,62 @@ func OptWithConfig(cfg *config.Config) IOption {
 func OptWithLogger(l logger.Logger) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.logerr = l
+	})
+}
+
+// OptWithSubSrvCallHook 配置
+func OptWithSubSrvCallHook(f handle.CallHookType) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.callHook = f
+	})
+}
+
+// OptWithSubSrvNotifyHook 配置
+func OptWithSubSrvNotifyHook(f handle.NotifyHookType) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.notifyHook = f
+	})
+}
+
+// GetClientOption 获取客户端链接选项
+type GetClientOption struct {
+	subSrv string
+	policy string
+}
+
+var defaultGetClientOption = GetClientOption{
+	subSrv: NoneSubService,
+}
+
+// IGetClientOption 获取客户端链接选项
+type IGetClientOption interface {
+	apply(*GetClientOption)
+}
+
+type funcGetClientOption struct {
+	f func(*GetClientOption)
+}
+
+func (fdo *funcGetClientOption) apply(do *GetClientOption) {
+	fdo.f(do)
+}
+
+func newFuncGetClientOptio(f func(*GetClientOption)) IGetClientOption {
+	return &funcGetClientOption{
+		f: f,
+	}
+}
+
+// GetClientOptWithSubService 子服务
+func GetClientOptWithSubService(srv string) IGetClientOption {
+	return newFuncGetClientOptio(func(gco *GetClientOption) {
+		gco.subSrv = srv
+	})
+}
+
+// GetClientOptWithPolicy 负载均衡策略
+func GetClientOptWithPolicy(p string) IGetClientOption {
+	return newFuncGetClientOptio(func(gco *GetClientOption) {
+		gco.policy = p
 	})
 }

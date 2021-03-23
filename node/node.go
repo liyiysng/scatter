@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/cluster"
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/acceptor"
 	"github.com/liyiysng/scatter/node/conn"
-	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/util"
 	"golang.org/x/net/trace"
@@ -34,6 +34,8 @@ var (
 	ErrNodeStopped = errors.New("node: the node has been stopped")
 	// ErrInvalidCertificates 证书配置错误
 	ErrInvalidCertificates = errors.New("certificates must be exactly two")
+	// ErrSubSrvNotSupport 不支持的子服务
+	ErrSubSrvNotSupport = errors.New("sub service not support")
 )
 
 // SocketProtcol 协议类型
@@ -58,6 +60,10 @@ type FrontRegister interface {
 // GrpcRegister grpc服务注册
 type GrpcRegister interface {
 	grpc.ServiceRegistrar
+	// RegisterSubService 注册子服务
+	RegisterSubService(recv interface{}) error
+	// RegisterSubServiceName 注册子服务
+	RegisterSubServiceName(name string, recv interface{}) error
 }
 
 // INodeRegister node 注册
@@ -83,11 +89,7 @@ type INodeServe interface {
 // 用于服务调用
 type INodeGrpcClient interface {
 	// GetGrpcClient 根据服务名获得客户端
-	GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err error)
-}
-
-// INode 节点
-type INode interface {
+	GetGrpcClient(srvName string, opts ...cluster.IGetClientOption) (c grpc.ClientConnInterface, err error)
 }
 
 // Node represent
@@ -170,14 +172,14 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		return nil, err
 	}
 
-	n.srvHandle = handle.NewServiceHandle(&handle.Option{
+	n.srvHandle = newSrvHandleProxy(handle.NewServiceHandle(&handle.Option{
 		Codec:            n.opts.getCodec(),
 		ReqTypeValidator: n.opts.reqTypeValidator,
 		ResTypeValidator: n.opts.resTypeValidator,
 		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
 		HookCall:         n.onCall,
 		HookNofify:       n.onNotify,
-	})
+	}), n.gnode, n.opts.subSrvValidator)
 
 	if opts.enableEventTrace {
 		_, file, line, _ := runtime.Caller(1)
@@ -219,8 +221,16 @@ func (n *Node) RegisterFrontName(name string, recv interface{}) error {
 	return n.srvHandle.RegisterName(name, recv)
 }
 
+func (n *Node) RegisterSubService(recv interface{}) error {
+	return n.gnode.RegisterSubService(recv)
+}
+
+func (n *Node) RegisterSubServiceName(name string, recv interface{}) error {
+	return n.gnode.RegisterSubServiceName(name, recv)
+}
+
 // GetGrpcClient 获取grpc client
-func (n *Node) GetGrpcClient(srvName string) (c grpc.ClientConnInterface, err error) {
+func (n *Node) GetGrpcClient(srvName string, opts ...cluster.IGetClientOption) (c grpc.ClientConnInterface, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

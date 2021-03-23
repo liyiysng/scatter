@@ -3,6 +3,7 @@ package policy
 import (
 	"context"
 
+	"github.com/liyiysng/scatter/cluster/selector"
 	"github.com/liyiysng/scatter/cluster/selector/policy/common"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/util/hash"
@@ -44,9 +45,9 @@ func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Pick
 		myLog.Info("[consistentHashBuilder.Build]--------------------------------------")
 		for _, v := range info.ReadySCs {
 			myLog.Infof("[consistentHashBuilder.Build] service_id[%s] srvName[%s] nodeID[%s] %p",
-				v.Address.Attributes.Value("serviceID"),
-				v.Address.Attributes.Value("srvName"),
-				v.Address.Attributes.Value("nodeID"),
+				v.Address.Attributes.Value(selector.AttrKeyServiceID),
+				v.Address.Attributes.Value(selector.AttrKeyServiceName),
+				v.Address.Attributes.Value(selector.AttrKeyNodeID),
 				b)
 		}
 		myLog.Info("[consistentHashBuilder.Build]--------------------------------------")
@@ -60,7 +61,7 @@ func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Pick
 			myLog.Errorf("[consistentHashBuilder.Build] attributes not fount")
 			continue
 		}
-		nodeID := v.Address.Attributes.Value("nodeID")
+		nodeID := v.Address.Attributes.Value(selector.AttrKeyNodeID)
 		if nodeID == nil {
 			myLog.Errorf("[consistentHashBuilder.Build] attributes nodeID not fount")
 			continue

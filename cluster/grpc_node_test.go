@@ -104,7 +104,7 @@ func TestGrpcNode(t *testing.T) {
 	wg.Wait()
 }
 
-func createGrpcNode(wg *sync.WaitGroup, id, addr string) (*GrpcNode, error) {
+func createGrpcNode(wg *sync.WaitGroup, id, addr string, cb ...func(gn *GrpcNode)) (*GrpcNode, error) {
 	n := NewGrpcNode(id)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -113,6 +113,10 @@ func createGrpcNode(wg *sync.WaitGroup, id, addr string) (*GrpcNode, error) {
 
 	cluster_testing.RegisterSrvStringsServer(n, &srvStringsImp{id: id})
 	cluster_testing.RegisterSrvIntsServer(n, &srvIntsImp{id: id})
+
+	for _, v := range cb {
+		v(n)
+	}
 
 	wg.Add(1)
 	go func() {

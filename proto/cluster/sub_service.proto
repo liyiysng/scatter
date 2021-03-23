@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package scatter.service;
+
+option go_package = "cluster/subsrvpb";
+
+message ErrorInfo{
+    enum ErrorType{
+        ErrorTypeCustom = 0;
+        ErrorTypeCritical = 1;
+        ErrorTypeCommon = 2;
+    }
+
+    ErrorType errType = 1;
+    string err = 2;
+}
+
+message CallReq{
+    string serviceName = 1;
+    string methodName = 2;
+    bytes payload = 3; 
+}
+
+message CallRes{
+    ErrorInfo errInfo = 1;
+    bytes payload = 2;
+}
+
+message NotifyReq{
+    string serviceName = 1;
+    string methodName = 2;
+    bytes payload = 3; 
+}
+
+message NotifyRes{
+    ErrorInfo errInfo = 1;
+}
+
+service SubService{
+    rpc Call (CallReq) returns (CallRes);
+    rpc Notify (NotifyReq) returns (NotifyRes);
+}

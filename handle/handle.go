@@ -20,4 +20,6 @@ type IHandler interface {
 	Call(ctx context.Context, session interface{}, serviceName string, methodName string, req []byte) (res []byte, err error)
 	//!
 	Notify(ctx context.Context, session interface{}, serviceName string, methodName string, req []byte) error
+	//! 获取所有服务名
+	AllServiceName() []string
 }

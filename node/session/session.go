@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
-	"github.com/liyiysng/scatter/node/handle"
 	"github.com/liyiysng/scatter/node/message"
 )
 

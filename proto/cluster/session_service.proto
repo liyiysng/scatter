@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package scatter.service;
+
+option go_package = "cluster/sessionpb";
+
+
+message SessionInfo{
+    int64 SID = 1;
+}
+
+message CreateSessionReq{
+    SessionInfo info = 1;
+}
+
+message CreateSessionRes{
+    SessionInfo info = 1;
+}
+
+service Sesssion{
+    rpc Create (SessionInfo) returns (CreateSessionRes);
+}

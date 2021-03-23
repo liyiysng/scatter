@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liyiysng/scatter/cluster/cluster_testing"
+	"github.com/liyiysng/scatter/cluster/subsrv"
 	"github.com/liyiysng/scatter/config"
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/conn"
@@ -203,6 +205,30 @@ func srvNode(n *Node) {
 			return
 		}
 		myLog.Info("node Serve finished")
+	}()
+}
+
+func srvNodeAll(n *Node, grpcAddr string) {
+	go func() {
+		err := n.Serve(SocketProtcolTCP, nodeBindAddr)
+		if err != nil {
+			myLog.Error(err)
+			return
+		}
+		myLog.Info("node Serve finished")
+	}()
+
+	go func() {
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			myLog.Error(err)
+			return
+		}
+		err = n.ServeGrpc(lis)
+		if err != nil {
+			myLog.Error(err)
+			return
+		}
 	}()
 }
 
@@ -1024,6 +1050,158 @@ func TestNodeEsSink(t *testing.T) {
 				time.Sleep(time.Second * 1)
 
 				t.Log(res)
+			}
+		}()
+
+	}
+
+	wwg.Wait()
+
+}
+
+type SubService0 struct {
+}
+
+func (s *SubService0) Foo1(ctx context.Context, session *subsrv.DummySession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+	myLog.Infof("[SubService0].Foo1")
+	res = &cluster_testing.String{
+		Str: req.Str,
+	}
+	return
+}
+
+type SubService1 struct {
+}
+
+func (s *SubService1) Foo1(ctx context.Context, session *subsrv.DummySession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+	myLog.Infof("[SubService1].Foo1")
+	res = &cluster_testing.String{
+		Str: req.Str,
+	}
+	return
+}
+
+func TestNodeSubSrv(t *testing.T) {
+
+	n1, err := NewNode(
+		1,
+		NOptShowHandleLog(false),
+		NOptTraceDetail(false),
+		NOptNodeName("test_node"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer n1.Stop()
+
+	n1.RegisterFront(&ServiceMetricsTest{})
+
+	srvNodeAll(n1, "127.0.0.1:5555")
+
+	n2, err := NewNode(
+		2,
+		NOptShowHandleLog(false),
+		NOptTraceDetail(false),
+		NOptNodeName("test_node"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer n2.Stop()
+	n2.RegisterSubService(&SubService0{})
+	n2.RegisterFront(&ServiceMetricsTest{})
+	srvNodeAll(n2, "127.0.0.1:5554")
+
+	// 确保node启动
+	time.Sleep(time.Second)
+
+	wwg := sync.WaitGroup{}
+
+	srvs := []string{
+		"ServiceMetricsTest.Foo1",
+		"ServiceMetricsTest.Foo2",
+		"ServiceMetricsTest.Foo3",
+		"ServiceMetricsTest.Foo4",
+	}
+
+	finish := util.NewEvent()
+
+	go func() {
+		time.Sleep(time.Second * 400)
+		finish.Fire()
+	}()
+
+	for i := 0; i < 10; i++ {
+
+		wwg.Add(1)
+		go func() {
+			defer wwg.Done()
+
+			// 创建客户端
+			conn, err := createClient(n1)
+			if err != nil {
+				myLog.Error(err)
+				return
+			}
+			client := &nodeClient{
+				codec:      n1.opts.getCodec(),
+				c:          conn,
+				closeEvent: util.NewEvent(),
+			}
+			defer client.close()
+			go client.runRead()
+
+			for {
+
+				if finish.HasFired() {
+					return
+				}
+
+				res := &node_testing.SumRes{}
+
+				done, err := client.call(
+					srvs[rand.Intn(len(srvs))],
+					&node_testing.SumReq{
+						LOP:     10,
+						ROP:     10,
+						DataStr: `xxxxxxxxxxxxxxx`,
+					},
+					res,
+					message.COMPRESS,
+				)
+
+				if err != nil {
+					myLog.Error(err)
+					return
+				}
+
+				<-done
+
+				t.Log(res)
+
+				subRes := &cluster_testing.String{}
+
+				done, err = client.call(
+					"SubService0.Foo1",
+					&cluster_testing.String{
+						Str: "///////////////////////////////////",
+					},
+					subRes,
+					message.COMPRESS,
+				)
+
+				if err != nil {
+					myLog.Error(err)
+					return
+				}
+
+				<-done
+
+				t.Log(subRes)
+
+				time.Sleep(time.Second * 1)
 			}
 		}()
 

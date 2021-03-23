@@ -104,7 +104,11 @@ func (c *Config) fillDefaultValues() {
 		},
 		"scatter.service.srvstrings.selectpolicy": "consistent_hash",
 		"scatter.service.srvstrings.meta":         map[string]string{"foo": "bar"},
-
+		// sub service setting//////////////////////////////////////////////////////////////////////////////////////////
+		"scatter.subservice.foo.selectpolicy": "consistent_hash",
+		"scatter.subservice.foo1": &SubService{
+			SelectPolicy: "consistent_hash",
+		},
 		// grpc node settings///////////////////////////////////////////////////////////////////////////////////////////
 		"scatter.gnode.dial.timeout": "10s", // 链接超时
 	}

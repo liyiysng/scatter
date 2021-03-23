@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/liyiysng/scatter/node/handle"
+	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/node/node_testing"
 	"github.com/liyiysng/scatter/node/session"
 )
