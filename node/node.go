@@ -170,7 +170,9 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		startTime: time.Now(),
 		sessions:  make(map[int64]session.Session),
 		quit:      util.NewEvent(),
-		gnode:     cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10), cluster.OptWithLogger(opts.Logger)),
+		gnode: cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10),
+			cluster.OptWithLogger(opts.Logger),
+			cluster.OptWithGrpcOption(opts.grpcOpts...)),
 	}
 
 	n.idGen, err = util.NewNode(nid)

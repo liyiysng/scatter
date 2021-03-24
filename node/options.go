@@ -11,6 +11,7 @@ import (
 	"github.com/liyiysng/scatter/metrics"
 	"github.com/liyiysng/scatter/node/textlog"
 	"github.com/olivere/elastic/v7"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	//json编码
@@ -118,6 +119,9 @@ type Options struct {
 
 	// sub servive validator
 	subSrvValidator func(srvName string) bool
+
+	// grpc 配置
+	grpcOpts []grpc.ServerOption
 }
 
 func (o *Options) validate() error {
@@ -372,6 +376,13 @@ func NOptWithSubSrvValidator(f func(srvName string) bool) IOption {
 			return
 		}
 		o.subSrvValidator = f
+	})
+}
+
+// NOptWithGrpcOpts grpc配置
+func NOptWithGrpcOpts(gopt ...grpc.ServerOption) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.grpcOpts = append(o.grpcOpts, gopt...)
 	})
 }
 

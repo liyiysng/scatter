@@ -25,6 +25,7 @@ const (
 type Options struct {
 	id string
 
+	// grpc 配置
 	grpcOpts []grpc.ServerOption
 
 	// 向registry注册时,过滤无需注册的服务,如健康检测服务等
@@ -119,6 +120,13 @@ func OptWithSubSrvCallHook(f handle.CallHookType) IOption {
 func OptWithSubSrvNotifyHook(f handle.NotifyHookType) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.notifyHook = f
+	})
+}
+
+// OptWithGrpcOption 配置
+func OptWithGrpcOption(gopt ...grpc.ServerOption) IOption {
+	return newFuncServerOption(func(o *Options) {
+		o.grpcOpts = append(o.grpcOpts, gopt...)
 	})
 }
 
