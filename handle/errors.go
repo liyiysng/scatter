@@ -28,9 +28,9 @@ func NewCustomErrorf(format string, args ...interface{}) ICustomError {
 }
 
 // NewCustomError 创建自定义错误
-func NewCustomError(err string) ICustomError {
+func NewCustomError(args ...interface{}) ICustomError {
 	return &CustomError{
-		err: err,
+		err: fmt.Sprint(args...),
 	}
 }
 
