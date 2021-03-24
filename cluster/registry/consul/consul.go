@@ -244,6 +244,12 @@ func (c *consulRegistry) Register(s *registry.Service, opts ...registry.Register
 
 	customTags := []string{}
 
+	if options.Context != nil {
+		if ct, ok := options.Context.Value(tagsKey).([]string); ok {
+			customTags = append(customTags, ct...)
+		}
+	}
+
 	tags := append(customTags, s.Version)
 
 	var check *consul.AgentServiceCheck

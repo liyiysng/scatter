@@ -52,8 +52,10 @@ const (
 // 函数签名 func (context.Context,session session.Session,req proto.Message,optionalArg...) (res proto.Message , err error)
 type FrontRegister interface {
 	// RegisterFront 注册一个前端服务
+	// 非协程安全
 	RegisterFront(recv interface{}) error
 	// RegisterFrontName 注册一个前端命名服务
+	// 非协程安全
 	RegisterFrontName(name string, recv interface{}) error
 }
 
@@ -61,8 +63,10 @@ type FrontRegister interface {
 type GrpcRegister interface {
 	grpc.ServiceRegistrar
 	// RegisterSubService 注册子服务
+	// 非协程安全
 	RegisterSubService(recv interface{}) error
 	// RegisterSubServiceName 注册子服务
+	// 非协程安全
 	RegisterSubServiceName(name string, recv interface{}) error
 }
 

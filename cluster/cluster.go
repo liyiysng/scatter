@@ -15,6 +15,7 @@ import (
 	"github.com/liyiysng/scatter/config"
 
 	// consul服务注册
+	"github.com/liyiysng/scatter/cluster/registry/consul"
 	_ "github.com/liyiysng/scatter/cluster/registry/consul"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc"
@@ -203,11 +204,17 @@ type GrpcNode struct {
 	subSrv *subsrv.SubServiceImp
 }
 
+// RegisterSubService 注册子服务
+// 非协程安全
 func (s *GrpcNode) RegisterSubService(recv interface{}) error {
+	s.lazyInitSubSrv()
 	return s.subSrv.SubSrvHandle.Register(recv)
 }
 
+// RegisterSubServiceName 注册子服务
+// 非协程安全
 func (s *GrpcNode) RegisterSubServiceName(name string, recv interface{}) error {
+	s.lazyInitSubSrv()
 	return s.subSrv.SubSrvHandle.RegisterName(name, recv)
 }
 
@@ -219,8 +226,10 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 	s.healthSrv.SetServingStatus("service_health", healthgrpc.HealthCheckResponse_SERVING)
 	defer s.healthSrv.Shutdown()
 
-	// 注册子服务
-	subsrvpb.RegisterSubServiceServer(s, s.subSrv)
+	if s.subSrv != nil {
+		// 注册子服务
+		subsrvpb.RegisterSubServiceServer(s, s.subSrv)
+	}
 
 	// 开始注册服务
 	srvNeedRegister, err := s.getSrvNeedRegister(lis.Addr().String())
@@ -232,9 +241,13 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 	for _, srv := range srvNeedRegister {
 		var err error
 		if s.opts.reg != nil {
-			err = s.opts.reg.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+			err = s.opts.reg.Register(srv,
+				registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")),
+				consul.WithRegistryTags([]string{s.opts.id}))
 		} else {
-			err = registry.Register(srv, registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")))
+			err = registry.Register(srv,
+				registry.RegisterGrpcTTL(s.opts.cfg.GetDuration("scatter.register.grpc_check_interval")),
+				consul.WithRegistryTags([]string{s.opts.id}))
 		}
 		if err != nil {
 			return err
@@ -327,6 +340,12 @@ func (s *GrpcNode) getSrvNeedRegister(addr string) ([]*registry.Service, error) 
 	return srvNeedRegister, nil
 }
 
+func (s *GrpcNode) lazyInitSubSrv() {
+	if s.subSrv == nil {
+		s.subSrv = subsrv.NewSubServiceImp(s.opts.getCodec(), s.opts.callHook, s.opts.notifyHook)
+	}
+}
+
 // NewGrpcNode 创建grpc节点
 func NewGrpcNode(id string, o ...IOption) *GrpcNode {
 
@@ -350,7 +369,6 @@ func NewGrpcNode(id string, o ...IOption) *GrpcNode {
 		Server:    grpc.NewServer(opts.grpcOpts...),
 		opts:      &opts,
 		healthSrv: health.NewServer(),
-		subSrv:    subsrv.NewSubServiceImp(opts.getCodec(), opts.callHook, opts.notifyHook),
 	}
 
 	return n
