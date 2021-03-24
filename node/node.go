@@ -89,6 +89,15 @@ type INodeServe interface {
 	Stop()
 }
 
+// Info 节点信息
+type Info struct {
+	NID            int64
+	FrontBindAddr  []string
+	FrontOuterAddr []string
+	FrontPattern   string
+	InnerGrpcAddr  net.Addr
+}
+
 // Node represent
 type Node struct {
 	mu sync.RWMutex
@@ -190,6 +199,31 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 	return
 }
 
+// GetNID 获取node id
+func (n *Node) GetNID() int64 {
+	return n.opts.ID
+}
+
+// GetInfo 获取节点信息
+func (n *Node) GetInfo() Info {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	bindAddrs := []string{}
+	outerAddrs := []string{}
+	for k := range n.accs {
+		bindAddrs = append(bindAddrs, k.GetAddr())
+		outerAddrs = append(outerAddrs, k.GetOuterAddr())
+	}
+
+	return Info{
+		NID:            n.opts.ID,
+		FrontBindAddr:  bindAddrs,
+		FrontOuterAddr: outerAddrs,
+		InnerGrpcAddr:  n.gnode.GetAddr(),
+	}
+}
+
 // RegisterFront 注册前端服务
 func (n *Node) RegisterFront(recv interface{}) error {
 	n.mu.Lock()
@@ -269,7 +303,16 @@ func (n *Node) AddAfterStop(f ...func()) error {
 // Serve 除Stop或者 被调用之外,都返回一个非nil错误
 // arg[0] = certfile
 // arg[1] = keyfile
-func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
+func (n *Node) Serve(sp SocketProtcol, addr string, opts ...INodeServeOption) error {
+
+	opt := NodeServeOption{}
+	for _, v := range opts {
+		v.apply(&opt)
+	}
+
+	if opt.outerAddr == "" {
+		opt.outerAddr = addr
+	}
 
 	n.waitGroup.Add(1)
 	defer n.waitGroup.Done()
@@ -284,23 +327,12 @@ func (n *Node) Serve(sp SocketProtcol, addr string, cert ...string) error {
 		return ErrNodeStopped
 	}
 
-	certFile := ""
-	keyFile := ""
-
-	if len(cert) > 0 {
-		if len(cert) != 2 {
-			n.mu.Unlock()
-			return ErrInvalidCertificates
-		}
-		certFile = cert[0]
-		keyFile = cert[1]
-	}
-
 	accOpt := acceptor.Option{
-		Addr:     addr,
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		Logger:   n.opts.Logger,
+		Addr:      addr,
+		OuterAddr: opt.outerAddr,
+		CertFile:  opt.certFile,
+		KeyFile:   opt.keyFile,
+		Logger:    n.opts.Logger,
 		GetConnOpt: func() conn.MsgConnOption {
 			ret := conn.MsgConnOption{
 				SID:                 n.idGen.Generate().Int64(),
@@ -497,6 +529,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		KeepAlive:         time.Minute * 5,
 		MaxMsgCacheNum:    3,
 		KickTimeout:       time.Second,
+		TimerResolution:   time.Second,
 	})
 
 	if n.opts.Logger.V(logger.VDEBUG) {
@@ -583,4 +616,31 @@ func (n *Node) onMessageFinished(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.Session)) error {
+
+	SIDs := make([]int64, 0, 128)
+	// copy sid
+	n.mu.Lock()
+	for k := range n.sessions {
+		SIDs = append(SIDs, k)
+	}
+	n.mu.Unlock()
+
+	go func() {
+		for index, value := range SIDs {
+			if (index+1)%numPerSec == 0 {
+				time.Sleep(time.Second)
+			}
+			// get session
+			n.mu.Lock()
+			s, ok := n.sessions[value]
+			n.mu.Unlock()
+			if ok {
+				foreachOnlineSession(s)
+			}
+		}
+	}()
+	return nil
 }

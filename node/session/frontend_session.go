@@ -56,6 +56,9 @@ type Option struct {
 	MaxMsgCacheNum int
 	// kick timeout ,剔出超时
 	KickTimeout time.Duration
+
+	// 计时器分辨率
+	TimerResolution time.Duration
 }
 
 type msgCtx struct {
@@ -128,6 +131,13 @@ func putMsgCtx(mctx *msgCtx) {
 	msgCtxPool.Put(mctx)
 }
 
+type sessionTicker struct {
+	interval  time.Duration
+	startTime time.Time
+	lastStamp time.Time
+	cb        func(t time.Time)
+}
+
 type frontendSession struct {
 	nid int64
 
@@ -165,6 +175,9 @@ type frontendSession struct {
 	attrs  map[string]interface{}
 	attrMu sync.Mutex
 
+	tickerMutex sync.Mutex
+	ticker      map[string]*sessionTicker
+
 	wg util.WaitGroupWrapper
 }
 
@@ -179,6 +192,7 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession
 		closeEvent: util.NewEvent(),
 		ctx:        context.Background(),
 		attrs:      make(map[string]interface{}),
+		ticker:     map[string]*sessionTicker{},
 	}
 	ret.ctx, ret.concel = context.WithCancel(ret.ctx)
 	// session_affinity support
@@ -464,6 +478,9 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 	checkConnectTimeout := time.NewTimer(s.opt.ConnectTimeout)
 	defer checkConnectTimeout.Stop()
 
+	tickerJob := time.NewTicker(s.opt.TimerResolution)
+	defer tickerJob.Stop()
+
 	defer func() {
 
 		s.Close()
@@ -493,6 +510,8 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 
 		// cancel context
 		s.concel()
+		// clean all ticker job
+		s.cleanTicker()
 	}()
 
 	defer func() {
@@ -560,6 +579,10 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 					s.opt.Logger.Warningf("connect timeout , handshake not recved in %v", s.opt.ConnectTimeout)
 					return
 				}
+			}
+		case <-tickerJob.C:
+			{
+				s.checkTicker()
 			}
 		}
 	}
@@ -975,4 +998,62 @@ func (s *frontendSession) closeConn(why string) {
 		s.opt.Logger.Errorf("session close error %v", err)
 	}
 	s.connClosed = true
+}
+
+func (s *frontendSession) AddTicker(name string, duration time.Duration, delay time.Duration, cb func(t time.Time)) (err error) {
+	s.tickerMutex.Lock()
+	defer s.tickerMutex.Unlock()
+	if _, ok := s.ticker[name]; ok {
+		return fmt.Errorf("%s ticker already exist", name)
+	}
+	s.ticker[name] = &sessionTicker{
+		interval:  duration,
+		startTime: time.Now().Add(delay),
+		lastStamp: time.Time{},
+		cb:        cb,
+	}
+	return nil
+}
+
+func (s *frontendSession) RemoveTicker(name string) (err error) {
+	s.tickerMutex.Lock()
+	defer s.tickerMutex.Unlock()
+	if _, ok := s.ticker[name]; !ok {
+		return fmt.Errorf("%s ticker not exist", name)
+	} else {
+		delete(s.ticker, name)
+	}
+	return nil
+}
+
+func (s *frontendSession) cleanTicker() {
+	s.tickerMutex.Lock()
+	defer s.tickerMutex.Unlock()
+	s.ticker = map[string]*sessionTicker{}
+}
+
+func (s *frontendSession) checkTicker() {
+
+	now := time.Now()
+	var cbs []func(t time.Time)
+
+	s.tickerMutex.Lock()
+	for _, value := range s.ticker {
+		if now.Before(value.startTime) {
+			continue
+		}
+		if value.lastStamp.IsZero() || now.After(value.lastStamp.Add(value.interval)) {
+			value.lastStamp = now
+			if value.cb != nil {
+				cbs = append(cbs, value.cb)
+			}
+		}
+	}
+	s.tickerMutex.Unlock()
+
+	for _, value := range cbs {
+		if value != nil {
+			go value(now)
+		}
+	}
 }

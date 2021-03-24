@@ -374,3 +374,44 @@ func NOptWithSubSrvValidator(f func(srvName string) bool) IOption {
 		o.subSrvValidator = f
 	})
 }
+
+// NodeServeOption 开启服务选项
+type NodeServeOption struct {
+	outerAddr string
+	certFile  string
+	keyFile   string
+}
+
+// IGrpcClientOpt 客户端选项
+type INodeServeOption interface {
+	apply(*NodeServeOption)
+}
+
+type funcNodeServeOption struct {
+	f func(*NodeServeOption)
+}
+
+func (fdo *funcNodeServeOption) apply(do *NodeServeOption) {
+	fdo.f(do)
+}
+
+func newFuncNodeServeOption(f func(*NodeServeOption)) INodeServeOption {
+	return &funcNodeServeOption{
+		f: f,
+	}
+}
+
+// OptNodeServeOptionWithOuterAddr 外部地址
+func OptNodeServeOptionWithOuterAddr(outerAddr string) INodeServeOption {
+	return newFuncNodeServeOption(func(o *NodeServeOption) {
+		o.outerAddr = outerAddr
+	})
+}
+
+// OptNodeServeOptionWithOuterAddr 外部地址
+func OptNodeServeOptionWithCert(certFile, keyFile string) INodeServeOption {
+	return newFuncNodeServeOption(func(o *NodeServeOption) {
+		o.certFile = certFile
+		o.keyFile = keyFile
+	})
+}

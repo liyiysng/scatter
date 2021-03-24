@@ -79,3 +79,24 @@ func NewCriticalErrorWithError(err error) ICriticalError {
 		err: err.Error(),
 	}
 }
+
+// NewArgumentsError 参数错误
+func NewArgumentsError(args ...interface{}) ICustomError {
+	return &CustomError{
+		err: fmt.Sprint(args...),
+	}
+}
+
+// NewArgumentsError 逻辑错误
+func NewLogicError(args ...interface{}) ICustomError {
+	return &CustomError{
+		err: fmt.Sprint(args...),
+	}
+}
+
+// NewConfigError 配置错误
+func NewConfigError(args ...interface{}) ICustomError {
+	return &CustomError{
+		err: fmt.Sprint(args...),
+	}
+}

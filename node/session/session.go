@@ -69,6 +69,14 @@ type Session interface {
 	BindUID(uid interface{})
 	//!
 	IsUIDBind() bool
+
+	// ticker job
+	// 任务将在单独的协程中执行
+	// 当session结束时,所有的定时任务自动清理
+	// AddTicker 添加定时任务
+	AddTicker(name string, duration time.Duration, delay time.Duration, cb func(t time.Time)) (err error)
+	// RemoveTicker 移除定时任务
+	RemoveTicker(name string) (err error)
 }
 
 // IFrontendSession 前端session

@@ -34,6 +34,11 @@ func (w *WSAcceptor) GetAddr() string {
 	return ""
 }
 
+// GetOuterAddr outer addr
+func (a *WSAcceptor) GetOuterAddr() string {
+	return a.opt.OuterAddr
+}
+
 // GetConnChan gets a connection channel
 func (w *WSAcceptor) GetConnChan() <-chan conn.MsgConn {
 	return w.connChan

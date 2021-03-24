@@ -202,6 +202,9 @@ type GrpcNode struct {
 
 	// 子服务处理
 	subSrv *subsrv.SubServiceImp
+
+	//addr
+	addr net.Addr
 }
 
 // RegisterSubService 注册子服务
@@ -216,6 +219,11 @@ func (s *GrpcNode) RegisterSubService(recv interface{}) error {
 func (s *GrpcNode) RegisterSubServiceName(name string, recv interface{}) error {
 	s.lazyInitSubSrv()
 	return s.subSrv.SubSrvHandle.RegisterName(name, recv)
+}
+
+// GetAddr 获取地址
+func (s *GrpcNode) GetAddr() net.Addr {
+	return s.addr
 }
 
 // Serve 开始服务
@@ -270,6 +278,8 @@ func (s *GrpcNode) Serve(lis net.Listener) error {
 			}
 		}
 	}()
+
+	s.addr = lis.Addr()
 
 	return s.Server.Serve(lis)
 }

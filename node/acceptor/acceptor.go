@@ -10,12 +10,14 @@ type Acceptor interface {
 	ListenAndServe() error
 	Stop()
 	GetAddr() string
+	GetOuterAddr() string
 	GetConnChan() <-chan conn.MsgConn
 }
 
 // Option 选项
 type Option struct {
 	Addr       string
+	OuterAddr  string
 	CertFile   string
 	KeyFile    string
 	GetConnOpt func() conn.MsgConnOption

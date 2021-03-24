@@ -38,6 +38,11 @@ func (a *TCPAcceptor) GetAddr() string {
 	return ""
 }
 
+// GetOuterAddr outer addr
+func (a *TCPAcceptor) GetOuterAddr() string {
+	return a.opt.OuterAddr
+}
+
 // GetConnChan gets a connection channel
 func (a *TCPAcceptor) GetConnChan() <-chan conn.MsgConn {
 	return a.connChan
