@@ -185,6 +185,7 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
 		HookCall:         n.onCall,
 		HookNofify:       n.onNotify,
+		OptArgs:          n.opts.optArgs,
 	}),
 		cluster.NewGrpcClient(cluster.OptGrpcClientWithLogger(n.opts.Logger)),
 		n.opts.subSrvValidator)
