@@ -259,13 +259,19 @@ func (s *frontendSession) PeerAddr() net.Addr {
 
 func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
-	data, err := s.opt.Codec.Marshal(v)
-	if err != nil {
-		return err
-	}
-
 	if s.closeEvent.HasFired() {
 		return ErrSessionClosed
+	}
+
+	var err error
+	var data []byte
+	if bytesData, ok := v.([]byte); ok {
+		data = bytesData
+	} else {
+		data, err = s.opt.Codec.Marshal(v)
+		if err != nil {
+			return err
+		}
 	}
 
 	p := message.DEFAULTPOPT
@@ -338,9 +344,16 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interfa
 		return ErrSessionClosed
 	}
 
-	data, err := s.opt.Codec.Marshal(v)
-	if err != nil {
-		return err
+	// 判定发送数据是否已经序列化
+	var err error
+	var data []byte
+	if bytesData, ok := v.([]byte); ok {
+		data = bytesData
+	} else {
+		data, err = s.opt.Codec.Marshal(v)
+		if err != nil {
+			return err
+		}
 	}
 
 	p := message.DEFAULTPOPT
@@ -373,9 +386,16 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 		return ErrSessionClosed
 	}
 
-	data, err := s.opt.Codec.Marshal(v)
-	if err != nil {
-		return err
+	// 判定发送数据是否已经序列化
+	var err error
+	var data []byte
+	if bytesData, ok := v.([]byte); ok {
+		data = bytesData
+	} else {
+		data, err = s.opt.Codec.Marshal(v)
+		if err != nil {
+			return err
+		}
 	}
 
 	p := message.DEFAULTPOPT

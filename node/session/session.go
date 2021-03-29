@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	csession "github.com/liyiysng/scatter/cluster/subsrv"
 	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/message"
@@ -40,6 +41,8 @@ type ISessionInfo interface {
 // Session 表示一个客户端,可能是TCP/UDP/ws(s)/http(s) 的一次会话
 type Session interface {
 	ISessionInfo
+	csession.Session
+
 	// 向客户端推送消息
 	Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error
 	// 向客户端推送消息
@@ -63,12 +66,7 @@ type Session interface {
 	GetAttr(key string) (v interface{}, ok bool)
 
 	// uid
-	//!
-	GetUID() interface{}
-	//!
 	BindUID(uid interface{})
-	//!
-	IsUIDBind() bool
 
 	// ticker job
 	// 任务将在单独的协程中执行

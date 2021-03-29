@@ -11,10 +11,6 @@ import (
 	"github.com/liyiysng/scatter/handle"
 )
 
-type DummySession int64
-
-var dummySession DummySession = 0
-
 const (
 	SubSrvGrpcName = "scatter.service.SubService"
 )
@@ -24,6 +20,24 @@ const (
 	// MetaKeySubSrv 获取所能处理的子服务(handle包中,非grpc服务)
 	MetaKeySubSrv = "_MetaKeySubSrv"
 )
+
+type Session interface {
+	// uid
+	//!
+	GetUID() interface{}
+	//!
+	IsUIDBind() bool
+}
+
+type SubSrvSession int64
+
+func (s *SubSrvSession) GetUID() interface{} {
+	return *s
+}
+
+func (s *SubSrvSession) IsUIDBind() bool {
+	return *s == 0
+}
 
 func GetSubSrvFromMeta(meta map[string]string) (srvs []string, err error) {
 	if str, ok := meta[MetaKeySubSrv]; ok {
@@ -66,7 +80,7 @@ func NewSubServiceImp(codec encoding.Codec, callHook handle.CallHookType, notify
 			}
 			return handle.ErrResponseTypeError
 		},
-		SessionType: reflect.TypeOf((*DummySession)(nil)),
+		SessionType: reflect.TypeOf((*SubSrvSession)(nil)),
 		HookCall:    callHook,
 		HookNofify:  notifyHook,
 	})
@@ -76,7 +90,9 @@ func NewSubServiceImp(codec encoding.Codec, callHook handle.CallHookType, notify
 
 func (ss *SubServiceImp) Call(ctx context.Context, req *subsrvpb.CallReq) (res *subsrvpb.CallRes, err error) {
 
-	resPayload, cerr := ss.SubSrvHandle.Call(ctx, &dummySession, req.ServiceName, req.MethodName, req.Payload)
+	s := SubSrvSession(req.UID)
+
+	resPayload, cerr := ss.SubSrvHandle.Call(ctx, &s, req.ServiceName, req.MethodName, req.Payload)
 
 	if cerr != nil {
 		errInfo := &subsrvpb.ErrorInfo{
@@ -103,7 +119,9 @@ func (ss *SubServiceImp) Call(ctx context.Context, req *subsrvpb.CallReq) (res *
 }
 func (ss *SubServiceImp) Notify(ctx context.Context, req *subsrvpb.NotifyReq) (res *subsrvpb.NotifyRes, err error) {
 
-	cerr := ss.SubSrvHandle.Notify(ctx, &dummySession, req.ServiceName, req.MethodName, req.Payload)
+	s := SubSrvSession(req.UID)
+
+	cerr := ss.SubSrvHandle.Notify(ctx, &s, req.ServiceName, req.MethodName, req.Payload)
 
 	if cerr != nil {
 		errInfo := &subsrvpb.ErrorInfo{

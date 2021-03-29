@@ -16,7 +16,7 @@ import (
 type SubService0 struct {
 }
 
-func (s *SubService0) Foo1(ctx context.Context, session *subsrv.DummySession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService0) Foo1(ctx context.Context, session *subsrv.SubSrvSession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	res = &cluster_testing.String{
 		Str: req.Str,
 	}
@@ -26,7 +26,7 @@ func (s *SubService0) Foo1(ctx context.Context, session *subsrv.DummySession, re
 type SubService1 struct {
 }
 
-func (s *SubService1) Foo1(ctx context.Context, session *subsrv.DummySession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService1) Foo1(ctx context.Context, session *subsrv.SubSrvSession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	res = &cluster_testing.String{
 		Str: req.Str,
 	}

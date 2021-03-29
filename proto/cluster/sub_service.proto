@@ -16,9 +16,10 @@ message ErrorInfo{
 }
 
 message CallReq{
-    string serviceName = 1;
-    string methodName = 2;
-    bytes payload = 3; 
+    int64 UID = 1;
+    string serviceName = 2;
+    string methodName = 3;
+    bytes payload = 4; 
 }
 
 message CallRes{
@@ -27,9 +28,10 @@ message CallRes{
 }
 
 message NotifyReq{
-    string serviceName = 1;
-    string methodName = 2;
-    bytes payload = 3; 
+    int64 UID = 1;
+    string serviceName = 2;
+    string methodName = 3;
+    bytes payload = 4; 
 }
 
 message NotifyRes{
