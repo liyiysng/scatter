@@ -32,7 +32,7 @@ type Session interface {
 type SubSrvSession int64
 
 func (s *SubSrvSession) GetUID() interface{} {
-	return *s
+	return int64(*s)
 }
 
 func (s *SubSrvSession) IsUIDBind() bool {
@@ -80,7 +80,7 @@ func NewSubServiceImp(codec encoding.Codec, callHook handle.CallHookType, notify
 			}
 			return handle.ErrResponseTypeError
 		},
-		SessionType: reflect.TypeOf((*SubSrvSession)(nil)),
+		SessionType: reflect.TypeOf((*Session)(nil)).Elem(),
 		HookCall:    callHook,
 		HookNofify:  notifyHook,
 	})

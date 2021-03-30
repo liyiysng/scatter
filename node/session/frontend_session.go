@@ -570,19 +570,19 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 				if err != nil {
 					// 关键错误
 					if cErr, ok := err.(handle.ICriticalError); ok {
+						s.opt.Logger.Errorf("handle req %s message encount a critical error %v", mctx.msgRead.GetService(), cErr)
 						s.finishMsg(mctx, cErr)
-						s.opt.Logger.Errorf("handle message encount a critical error %v", cErr)
 						return
 					} else if customErr, ok := err.(handle.ICustomError); ok {
 						// 非关键错误
 						if s.opt.Logger.V(logger.VDEBUG) {
-							s.opt.Logger.Warningf("handle message encount custom error %v", customErr)
+							s.opt.Logger.Warningf("handle req %s message encount custom error %v", mctx.msgRead.GetService(), customErr)
 						}
 					} else {
-						s.finishMsg(mctx, cErr)
 						if s.opt.Logger.V(logger.VDEBUG) {
-							s.opt.Logger.Warningf("handle message encount a error %v", err)
+							s.opt.Logger.Warningf("handle req %s message encount a error %v", mctx.msgRead.GetService(), err)
 						}
+						s.finishMsg(mctx, cErr)
 						return
 					}
 				}

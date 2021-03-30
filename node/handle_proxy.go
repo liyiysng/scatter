@@ -9,6 +9,7 @@ import (
 	"github.com/liyiysng/scatter/cluster"
 	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"github.com/liyiysng/scatter/handle"
+	nsession "github.com/liyiysng/scatter/node/session"
 )
 
 // 若内部handle不支持该服务,则转发该服务
@@ -67,6 +68,7 @@ func (h *srvHanleProxy) Call(ctx context.Context, session interface{}, serviceNa
 		return nil, err
 	}
 	cres, err := client.Call(ctx, &subsrvpb.CallReq{
+		UID:         session.(nsession.Session).GetUID().(int64),
 		ServiceName: serviceName,
 		MethodName:  methodName,
 		Payload:     req,
@@ -99,6 +101,7 @@ func (h *srvHanleProxy) Notify(ctx context.Context, session interface{}, service
 		return err
 	}
 	cres, err := client.Notify(ctx, &subsrvpb.NotifyReq{
+		UID:         session.(nsession.Session).GetUID().(int64),
 		ServiceName: serviceName,
 		MethodName:  methodName,
 		Payload:     req,
