@@ -8,6 +8,7 @@ import (
 	"time"
 
 	csession "github.com/liyiysng/scatter/cluster/subsrv"
+	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/node/message"
@@ -66,7 +67,7 @@ type Session interface {
 	GetAttr(key string) (v interface{}, ok bool)
 
 	// uid
-	BindUID(uid interface{})
+	BindUID(uid constants.UID)
 
 	// ticker job
 	// 任务将在单独的协程中执行

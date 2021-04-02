@@ -13,6 +13,7 @@ import (
 	"github.com/liyiysng/scatter/cluster/subsrv"
 	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"github.com/liyiysng/scatter/config"
+	"github.com/liyiysng/scatter/handle"
 
 	// consul服务注册
 	"github.com/liyiysng/scatter/cluster/registry/consul"
@@ -207,18 +208,33 @@ type GrpcNode struct {
 	addr net.Addr
 }
 
+// GetSubServiceHandle 获取子服务处理
+func (s *GrpcNode) GetSubServiceHandle() handle.IHandler {
+	if s.subSrv != nil {
+		return s.subSrv.SubSrvHandle
+	}
+	return nil
+}
+
 // RegisterSubService 注册子服务
 // 非协程安全
 func (s *GrpcNode) RegisterSubService(recv interface{}) error {
 	s.lazyInitSubSrv()
-	return s.subSrv.SubSrvHandle.Register(recv)
+	return s.subSrv.RegisterTansfered(recv)
 }
 
 // RegisterSubServiceName 注册子服务
 // 非协程安全
 func (s *GrpcNode) RegisterSubServiceName(name string, recv interface{}) error {
 	s.lazyInitSubSrv()
-	return s.subSrv.SubSrvHandle.RegisterName(name, recv)
+	return s.subSrv.RegisterTansferedName(name, recv)
+}
+
+// Subscribe 订阅
+// 非协程安全
+func (s *GrpcNode) Subscribe(topic string, recv interface{}) error {
+	s.lazyInitSubSrv()
+	return s.subSrv.Subscribe(topic, recv)
 }
 
 // GetAddr 获取地址
@@ -352,7 +368,7 @@ func (s *GrpcNode) getSrvNeedRegister(addr string) ([]*registry.Service, error) 
 
 func (s *GrpcNode) lazyInitSubSrv() {
 	if s.subSrv == nil {
-		s.subSrv = subsrv.NewSubServiceImp(s.opts.getCodec(), s.opts.callHook, s.opts.notifyHook)
+		s.subSrv = subsrv.NewSubServiceImp(s.opts.callHook, s.opts.notifyHook)
 	}
 }
 

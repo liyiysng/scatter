@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package scatter.service;
+
+option go_package = "github.com/liyiysng/scatter/cluster/sessionpb";
+
+enum SessionType{
+    FrontEnd = 0; // 前端
+    Transfer = 1;// 转发
+    Backend = 2; // 后端
+    Pub = 3; // 由发布者
+}
+
+message TransferInfo{
+    int64 UID = 1;
+}
+
+message FrontEndInfo{
+    int64 UID = 1;
+    int64 SID = 2;
+}
+
+message BackendInfo{
+
+}
+
+message PubInfo{
+
+}
+
+message SessionInfo{
+    SessionType SType = 1;
+    TransferInfo TransferInfo = 2;
+    FrontEndInfo FrontEndInfo = 3;
+    BackendInfo BackendInfo = 4;
+    PubInfo PubInfo = 5;
+}
+
+message CreateSessionReq{
+    SessionInfo info = 1;
+}
+
+message CreateSessionRes{
+    SessionInfo info = 1;
+}
+
+service Sesssion{
+    rpc Create (SessionInfo) returns (CreateSessionRes);
+}

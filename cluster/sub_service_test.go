@@ -8,7 +8,8 @@ import (
 
 	"github.com/liyiysng/scatter/cluster/cluster_testing"
 	"github.com/liyiysng/scatter/cluster/selector/policy"
-	"github.com/liyiysng/scatter/cluster/subsrv"
+	"github.com/liyiysng/scatter/cluster/session"
+	"github.com/liyiysng/scatter/cluster/sessionpb"
 	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,7 +17,7 @@ import (
 type SubService0 struct {
 }
 
-func (s *SubService0) Foo1(ctx context.Context, session *subsrv.SubSrvSession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService0) Foo1(ctx context.Context, session session.ISession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	res = &cluster_testing.String{
 		Str: req.Str,
 	}
@@ -26,7 +27,7 @@ func (s *SubService0) Foo1(ctx context.Context, session *subsrv.SubSrvSession, r
 type SubService1 struct {
 }
 
-func (s *SubService1) Foo1(ctx context.Context, session *subsrv.SubSrvSession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService1) Foo1(ctx context.Context, session session.ISession, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	res = &cluster_testing.String{
 		Str: req.Str,
 	}
@@ -91,7 +92,13 @@ func TestSubService(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	sinfo := &sessionpb.SessionInfo{
+		SType:   sessionpb.SessionType_Pub,
+		PubInfo: &sessionpb.PubInfo{},
+	}
+
 	res, err := client.Call(ctx, &subsrvpb.CallReq{
+		Sinfo:       sinfo,
 		ServiceName: "foo",
 		MethodName:  "Foo1",
 		Payload:     payload,
@@ -102,6 +109,7 @@ func TestSubService(t *testing.T) {
 
 	t.Log(res)
 	res, err = client1.Call(ctx, &subsrvpb.CallReq{
+		Sinfo:       sinfo,
 		ServiceName: "foo1",
 		MethodName:  "Foo1",
 		Payload:     payload,

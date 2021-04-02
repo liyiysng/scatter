@@ -800,6 +800,14 @@ func TestNodeMsgOpt(t *testing.T) {
 type ServiceMetricsTest struct {
 }
 
+func (srv *ServiceMetricsTest) OnStart(n *Node) {
+	myLog.Infof("OnStart node %d", n.GetInfo().NID)
+}
+
+func (srv *ServiceMetricsTest) OnStop() {
+	myLog.Info("OnStop node")
+}
+
 func (srv *ServiceMetricsTest) Foo1(ctx context.Context, session session.Session, req *node_testing.SumReq) (res *node_testing.SumRes, err error) {
 
 	res = &node_testing.SumRes{
@@ -1062,7 +1070,7 @@ func TestNodeEsSink(t *testing.T) {
 type SubService0 struct {
 }
 
-func (s *SubService0) Foo1(ctx context.Context, session *subsrv.Session, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService0) Foo1(ctx context.Context, session subsrv.Session, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	myLog.Infof("[SubService0].Foo1")
 	res = &cluster_testing.String{
 		Str: req.Str,
@@ -1073,7 +1081,7 @@ func (s *SubService0) Foo1(ctx context.Context, session *subsrv.Session, req *cl
 type SubService1 struct {
 }
 
-func (s *SubService1) Foo1(ctx context.Context, session *subsrv.Session, req *cluster_testing.String) (res *cluster_testing.String, err error) {
+func (s *SubService1) Foo1(ctx context.Context, session subsrv.Session, req *cluster_testing.String) (res *cluster_testing.String, err error) {
 	myLog.Infof("[SubService1].Foo1")
 	res = &cluster_testing.String{
 		Str: req.Str,

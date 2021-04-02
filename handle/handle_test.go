@@ -94,12 +94,9 @@ func (t *TestService) AddOptArg(ctx context.Context, session fooSessionType, req
 func TestServiceHandler(t *testing.T) {
 
 	otp := &Option{
-		Codec:            encoding.GetCodec("json"),
-		ReqTypeValidator: func(reqType reflect.Type) error { return nil },
-		ResTypeValidator: func(reqType reflect.Type) error { return nil },
-		SessionType:      reflect.TypeOf((*fooSessionType)(nil)).Elem(),
-		HookCall:         hookCall,
-		HookNofify:       notifyCall,
+		Codec:      encoding.GetCodec("json"),
+		HookCall:   hookCall,
+		HookNofify: notifyCall,
 		OptArgs: &OptionalArgs{
 			ArgsTypeValidator: func(srvName string, methodName string, argsType []reflect.Type) error {
 				if strings.HasSuffix(methodName, "Args") {
@@ -129,7 +126,16 @@ func TestServiceHandler(t *testing.T) {
 
 	h.Register(&TestService{
 		t: t,
-	})
+	},
+		OptWithReqTypeValidator(func(reqType reflect.Type) error { return nil }),
+		OptWithResTypeValidator(func(reqType reflect.Type) error { return nil }),
+		OptWithSessionTypeValidator(func(t reflect.Type) error {
+			if t != reflect.TypeOf((*fooSessionType)(nil)).Elem() {
+				return errors.New("session type invalid")
+			}
+			return nil
+		}),
+	)
 
 	req := &TestReq{
 		LValue: 5,

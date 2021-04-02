@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package scatter.service;
+
+option go_package = "github.com/liyiysng/scatter/cluster/subsrvpb";
+
+import "cluster/sessionpb/session_service.proto";
+
+message ErrorInfo{
+    enum ErrorType{
+        ErrorTypeCustom = 0;
+        ErrorTypeCritical = 1;
+        ErrorTypeCommon = 2;
+    }
+
+    ErrorType errType = 1;
+    string err = 2;
+}
+
+message CallReq{
+    SessionInfo sinfo = 1;
+    string serviceName = 2;
+    string methodName = 3;
+    bytes payload = 4; 
+}
+
+message CallRes{
+    ErrorInfo errInfo = 1;
+    bytes payload = 2;
+}
+
+message NotifyReq{
+    SessionInfo sinfo = 1;
+    string serviceName = 2;
+    string methodName = 3;
+    bytes payload = 4;
+}
+
+message NotifyRes{
+    ErrorInfo errInfo = 1;
+}
+
+message PubReq{
+    SessionInfo sinfo = 1;
+    string topic = 2;
+    string cmd = 3;
+    bytes payload = 4;
+}
+
+message PubRes{
+    ErrorInfo errInfo = 1;
+}
+
+service SubService{
+    rpc Call (CallReq) returns (CallRes);
+    rpc Notify (NotifyReq) returns (NotifyRes);
+    rpc Pub(PubReq) returns (PubRes);
+}

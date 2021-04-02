@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/liyiysng/scatter/cluster/selector/policy"
+	"github.com/liyiysng/scatter/cluster/sessionpb"
+	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
@@ -141,7 +143,7 @@ type sessionTicker struct {
 type frontendSession struct {
 	nid int64
 
-	uid interface{}
+	uid constants.UID
 
 	opt *Option
 
@@ -186,6 +188,7 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession
 	ret := &frontendSession{
 		nid:        nid,
 		conn:       c,
+		uid:        constants.DefaultUID,
 		opt:        opt,
 		readChan:   make(chan *msgCtx, opt.ReadChanSize),
 		writeChan:  make(chan *msgCtx, opt.WriteChanSize),
@@ -214,18 +217,29 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession
 	return ret
 }
 
-func (s *frontendSession) GetUID() interface{} {
+// Info session 信息
+func (s *frontendSession) Info() *sessionpb.SessionInfo {
+	return &sessionpb.SessionInfo{
+		SType: sessionpb.SessionType_FrontEnd,
+		FrontEndInfo: &sessionpb.FrontEndInfo{
+			UID: s.uid,
+			SID: s.GetSID(),
+		},
+	}
+}
+
+func (s *frontendSession) GetUID() constants.UID {
 	return s.uid
 }
 
-func (s *frontendSession) BindUID(uid interface{}) {
+func (s *frontendSession) BindUID(uid constants.UID) {
 	s.uid = uid
 	strUID := fmt.Sprintf("%v", uid)
 	s.ctx = policy.WithConsistentHashID(s.ctx, strUID)
 }
 
 func (s *frontendSession) IsUIDBind() bool {
-	return s.uid != nil
+	return s.uid != constants.DefaultUID
 }
 
 func (s *frontendSession) SetAttr(key string, v interface{}) {

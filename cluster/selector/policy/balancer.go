@@ -18,6 +18,8 @@ var (
 	ErrorSessionFuncNotFount = errors.New("session bind function not found")
 	// ErrorContextIDNotBind ID未绑定
 	ErrorContextIDNotBind = errors.New("id value does not in context")
+	// ErrorContextNodeIDNotBind node id 未绑定
+	ErrorContextNodeIDNotBind = errors.New("node id value does not in context")
 	// ErrorServerUnvaliable 服务器不可用
 	ErrorServerUnvaliable = errors.New("server unabliable")
 	// ErrorServiceFormatError 服务名称错误
@@ -28,6 +30,8 @@ func init() {
 	// 注册 session_affinity
 	balancer.Register(newSessionAffinityBuilder())
 	balancer.Register(newConsistentHashBuilder())
+	balancer.Register(newP2CBuilder())
+	balancer.Register(newPubBuilder())
 }
 
 // ErrorAcceptable checks if given error is acceptable.

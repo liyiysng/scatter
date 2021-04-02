@@ -15,6 +15,8 @@ var (
 	ErrRequstTypeError = errors.New("handle: service request argument type error")
 	// ErrResponseTypeError 服务回复参数类型错误
 	ErrResponseTypeError = errors.New("handle: service response argument type error")
+	// ErrSessionTypeError session 类型错误
+	ErrSessionTypeError = errors.New("handle: service session argument type error")
 )
 
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
@@ -79,10 +81,7 @@ var DefaultNotifyHook = func(ctx context.Context, session interface{}, srv inter
 
 // Option handle 选项设置
 type Option struct {
-	Codec            encoding.Codec
-	ReqTypeValidator func(reqType reflect.Type) error // 請求類型驗證
-	ResTypeValidator func(reqType reflect.Type) error // 回复類型驗證
-	SessionType      reflect.Type
+	Codec encoding.Codec
 
 	OptArgs *OptionalArgs
 
@@ -97,10 +96,16 @@ type serviceHandler struct {
 
 // NewServiceHandle 创建服务处理
 func NewServiceHandle(opt *Option) IHandler {
-	if opt.Codec == nil || opt.HookCall == nil ||
-		opt.HookNofify == nil || opt.ReqTypeValidator == nil ||
-		opt.ResTypeValidator == nil || opt.SessionType == nil {
+	if opt.Codec == nil {
 		panic("invalid handle option")
+	}
+
+	if opt.HookCall == nil {
+		opt.HookCall = DefaultCallHook
+	}
+
+	if opt.HookNofify == nil {
+		opt.HookNofify = DefaultNotifyHook
 	}
 
 	return &serviceHandler{
@@ -117,12 +122,20 @@ func (s *serviceHandler) AllServiceName() []string {
 	return ret
 }
 
-func (s *serviceHandler) Register(recv interface{}) error {
-	return s.register(recv, "", false)
+func (s *serviceHandler) AllRecv() []interface{} {
+	ret := []interface{}{}
+	for _, v := range s.serviceMap {
+		ret = append(ret, v.recv.Interface())
+	}
+	return ret
 }
 
-func (s *serviceHandler) RegisterName(name string, recv interface{}) error {
-	return s.register(recv, name, true)
+func (s *serviceHandler) Register(recv interface{}, opt ...RegisterOpt) error {
+	return s.register(recv, "", false, opt...)
+}
+
+func (s *serviceHandler) RegisterName(name string, recv interface{}, opt ...RegisterOpt) error {
+	return s.register(recv, name, true, opt...)
 }
 
 func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceName string, methodName string, req []byte) (res []byte, err error) {
@@ -292,7 +305,18 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 	return
 }
 
-func (s *serviceHandler) register(recv interface{}, name string, useName bool) error {
+func (s *serviceHandler) register(recv interface{}, name string, useName bool, opt ...RegisterOpt) error {
+
+	opts := defaultRegisterOpt
+
+	for _, v := range opt {
+		v(&opts)
+	}
+
+	if !opts.allowCall && !opts.allowNotify {
+		return errors.New("invalid register option: all method forbiden")
+	}
+
 	srv := new(service)
 	srv.typ = reflect.TypeOf(recv)
 	srv.recv = reflect.ValueOf(recv)
@@ -309,13 +333,13 @@ func (s *serviceHandler) register(recv interface{}, name string, useName bool) e
 	srv.name = sname
 
 	// Install the methods
-	srv.method = s.suitableMethods(srv.typ, sname, true)
+	srv.method = s.suitableMethods(srv.typ, sname, true, &opts)
 
 	if len(srv.method) == 0 {
 		str := ""
 
 		// To help the user, see if a pointer receiver would work.
-		method := s.suitableMethods(reflect.PtrTo(srv.typ), sname, false)
+		method := s.suitableMethods(reflect.PtrTo(srv.typ), sname, false, &opts)
 		if len(method) != 0 {
 			str = "serviceHandler.Register: type " + sname + " has no exported methods of suitable type (hint: pass a pointer to value of that type)"
 		} else {
@@ -332,12 +356,16 @@ func (s *serviceHandler) register(recv interface{}, name string, useName bool) e
 	return nil
 }
 
-func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, reportErr bool) map[string]*methodType {
+func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, reportErr bool, opts *regiserOpt) map[string]*methodType {
 	methods := make(map[string]*methodType)
 	for m := 0; m < typ.NumMethod(); m++ {
 		method := typ.Method(m)
 		mtype := method.Type
 		mname := method.Name
+
+		if opts.IgnoreMethod(mname) {
+			continue
+		}
 
 		mt := &methodType{method: method}
 
@@ -362,9 +390,10 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, repor
 		}
 
 		// second arg need be a session
-		if argSession := mtype.In(2); argSession != s.SessionType && !argSession.Implements(s.SessionType) {
+		argSession := mtype.In(2)
+		if serr := opts.SessionTypeValidator(argSession); serr != nil {
 			if reportErr {
-				myLog.Errorf("method %s.%s first argument type not a session but a %v", srvName, mname, argSession)
+				myLog.Errorf("method %s.%s first argument type not a session but a %v , %v", srvName, mname, argSession, serr)
 			}
 			continue
 		}
@@ -383,7 +412,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, repor
 			}
 			continue
 		}
-		err := s.ReqTypeValidator(argReq)
+		err := opts.ReqTypeValidator(argReq)
 		if err != nil {
 			if reportErr {
 				myLog.Errorf("method %s.%s argument type %v invalid %v ", srvName, mname, argReq, err)
@@ -425,6 +454,20 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, repor
 			continue
 		}
 
+		if !opts.allowCall && mtype.NumOut() != 1 { // just notfiy
+			if reportErr {
+				myLog.Errorf("method %s.%s has wrong number of outs: %d, call function not allow", srvName, mname, mtype.NumOut())
+			}
+			continue
+		}
+
+		if !opts.allowNotify && mtype.NumOut() != 2 { // just call
+			if reportErr {
+				myLog.Errorf("method %s.%s has wrong number of outs: %d , notify function not allow", srvName, mname, mtype.NumOut())
+			}
+			continue
+		}
+
 		// an notify method
 		if mtype.NumOut() == 1 {
 			// The return type of the method must be error.
@@ -452,7 +495,7 @@ func (s *serviceHandler) suitableMethods(typ reflect.Type, srvName string, repor
 				}
 				continue
 			}
-			err = s.ResTypeValidator(returnResType)
+			err = opts.ResTypeValidator(returnResType)
 			if err != nil {
 				if reportErr {
 					myLog.Errorf("method %s.%s return type invalid :%v err: %v", srvName, mname, returnResType, err)

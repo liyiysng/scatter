@@ -9,6 +9,7 @@ require (
 	github.com/golang/snappy v0.0.2
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.8.1
+	github.com/nsqio/go-nsq v1.0.8
 	github.com/olivere/elastic/v7 v7.0.22
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/prometheus/client_golang v1.9.0

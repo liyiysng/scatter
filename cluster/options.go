@@ -6,12 +6,6 @@ import (
 	"github.com/liyiysng/scatter/cluster/registry"
 	"github.com/liyiysng/scatter/config"
 
-	//json编码
-	_ "github.com/liyiysng/scatter/encoding/json"
-	//proto编码
-	_ "github.com/liyiysng/scatter/encoding/proto"
-
-	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc"
@@ -46,9 +40,6 @@ type Options struct {
 	// 配置
 	cfg *config.Config
 
-	// 编码
-	codec string
-
 	// sub service hook
 	callHook   handle.CallHookType
 	notifyHook handle.NotifyHookType
@@ -56,17 +47,7 @@ type Options struct {
 
 var defaultOptions = Options{
 	registryFillter: func(srvName string) bool { return !strings.Contains(srvName, "grpc.health") }, // 跳过健康服务注册
-	codec:           "proto",
-	callHook:        handle.DefaultCallHook,
-	notifyHook:      handle.DefaultNotifyHook,
 	nodeMeta:        map[string]string{},
-}
-
-func (o *Options) getCodec() encoding.Codec {
-	if o.codec != "" {
-		return encoding.GetCodec(o.codec)
-	}
-	return encoding.GetCodec("proto")
 }
 
 // IOption 服务器选项

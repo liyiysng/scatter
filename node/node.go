@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,6 +27,21 @@ import (
 var (
 	myLog = logger.Component("node")
 )
+
+// IStart 当节点启动时调用
+type IStart interface {
+	OnStart(n *Node)
+}
+
+// IBeforeStop 当节点停止前调用
+type IStop interface {
+	OnStop()
+}
+
+func init() {
+	handle.AddIgnorMethod("OnStart")
+	handle.AddIgnorMethod("OnStop")
+}
 
 var (
 	// ErrNodeStopped 节点已停止
@@ -82,9 +96,7 @@ type INodeServe interface {
 	ServeGrpc(lis net.Listener) error
 	// Serve 启动一个前端Serve,阻塞函数,一般运行在单独的goroutine
 	// Serve 除Stop或者 被调用之外,都返回一个非nil错误
-	// arg[0] = certfile
-	// arg[1] = keyfile
-	Serve(sp SocketProtcol, addr string, cert ...string) error
+	Serve(sp SocketProtcol, opts ...INodeServeOption) error
 	// 停止该节点
 	Stop()
 }
@@ -181,13 +193,10 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 	}
 
 	n.srvHandle = newSrvHandleProxy(handle.NewServiceHandle(&handle.Option{
-		Codec:            n.opts.getCodec(),
-		ReqTypeValidator: n.opts.reqTypeValidator,
-		ResTypeValidator: n.opts.resTypeValidator,
-		SessionType:      reflect.TypeOf((*session.Session)(nil)).Elem(),
-		HookCall:         n.onCall,
-		HookNofify:       n.onNotify,
-		OptArgs:          n.opts.optArgs,
+		Codec:      n.opts.getCodec(),
+		HookCall:   n.onCall,
+		HookNofify: n.onNotify,
+		OptArgs:    n.opts.optArgs,
 	}),
 		cluster.NewGrpcClient(cluster.OptGrpcClientWithLogger(n.opts.Logger)),
 		n.opts.subSrvValidator)
@@ -197,7 +206,7 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		n.trEvents = trace.NewEventLog("scatter.Node", fmt.Sprintf("%d-%s:%d", opts.ID, file, line))
 	}
 
-	opts.Logger.Infof("start node %d", opts.ID)
+	opts.Logger.Infof("create node %d", opts.ID)
 
 	return
 }
@@ -238,8 +247,11 @@ func (n *Node) RegisterFront(recv interface{}) error {
 	if n.serve {
 		return fmt.Errorf("[Node.Register] register service after Node.Serve")
 	}
-
-	return n.srvHandle.Register(recv)
+	return n.srvHandle.Register(recv,
+		handle.OptWithReqTypeValidator(n.opts.reqTypeValidator),
+		handle.OptWithResTypeValidator(n.opts.resTypeValidator),
+		handle.OptWithSessionTypeValidator(n.opts.sessionTypeValidator),
+	)
 }
 
 // RegisterFrontName 注册命名前端服务
@@ -254,7 +266,11 @@ func (n *Node) RegisterFrontName(name string, recv interface{}) error {
 		return fmt.Errorf("[Node.Register] register service after Node.Serve %q", name)
 	}
 
-	return n.srvHandle.RegisterName(name, recv)
+	return n.srvHandle.RegisterName(name, recv,
+		handle.OptWithReqTypeValidator(n.opts.reqTypeValidator),
+		handle.OptWithResTypeValidator(n.opts.resTypeValidator),
+		handle.OptWithSessionTypeValidator(n.opts.sessionTypeValidator),
+	)
 }
 
 func (n *Node) RegisterSubService(recv interface{}) error {
@@ -286,6 +302,30 @@ func (n *Node) ServeGrpc(lis net.Listener) error {
 		return ErrNodeStopped
 	}
 	n.mu.Unlock()
+
+	// 调用onStart
+	allRecv := []interface{}{}
+	n.mu.Lock()
+	h := n.gnode.GetSubServiceHandle()
+	if h != nil {
+		allRecv = n.gnode.GetSubServiceHandle().AllRecv()
+	}
+	n.mu.Unlock()
+
+	for _, v := range allRecv {
+		if s, ok := v.(IStart); ok {
+			go s.OnStart(n)
+		}
+	}
+
+	defer func() {
+		// OnStop
+		for _, v := range allRecv {
+			if s, ok := v.(IStop); ok {
+				go s.OnStop()
+			}
+		}
+	}()
 
 	return n.gnode.Serve(lis)
 }
@@ -399,6 +439,26 @@ func (n *Node) Serve(sp SocketProtcol, addr string, opts ...INodeServeOption) er
 				n.opts.Logger.Errorf("[Node.Serve] node %v stoped cause by %v", n.opts.ID, err)
 			}
 		}, n.opts.Logger.Errorf)
+
+	// 调用onStart
+	n.mu.Lock()
+	allRecv := n.srvHandle.AllRecv()
+	n.mu.Unlock()
+
+	for _, v := range allRecv {
+		if s, ok := v.(IStart); ok {
+			go s.OnStart(n)
+		}
+	}
+
+	defer func() {
+		// OnStop
+		for _, v := range allRecv {
+			if s, ok := v.(IStop); ok {
+				go s.OnStop()
+			}
+		}
+	}()
 
 	// 此处无需检查node是否退出
 	// node 停止时,会关闭所有的acceptor

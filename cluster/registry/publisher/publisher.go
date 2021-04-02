@@ -30,9 +30,9 @@ var defaultPubOptions = &PubOptions{
 	watchFillter: func(srvName string, n *registry.Node) bool { return !strings.Contains(srvName, "consul") }, // 过滤consul服务
 }
 
-type pubData struct {
-	srvName string
-	node    *registry.Node
+type PubData struct {
+	SrvName string
+	Node    *registry.Node
 }
 
 // Publisher 发布注册事件
@@ -69,8 +69,8 @@ func NewPublisher(ops *PubOptions) (pub *Publisher, err error) {
 // 复制写入当前已改变的服务状态
 func (s *Publisher) Subscribe(filtter func(srvName string, node *registry.Node) bool) chan interface{} {
 	return s.pub.SubscribeTopic(func(v interface{}) bool {
-		data := v.(*pubData)
-		return filtter(data.srvName, data.node)
+		data := v.(*PubData)
+		return filtter(data.SrvName, data.Node)
 	})
 }
 
@@ -208,9 +208,9 @@ func (s *Publisher) addNode(srv *registry.Service, node *registry.Node) {
 		myLog.Infof("find node servcice %s : %v", rs.Name, node)
 		rs.Nodes = append(rs.Nodes, node)
 
-		s.pub.Publish(&pubData{
-			srvName: srv.Name,
-			node:    node,
+		s.pub.Publish(&PubData{
+			SrvName: srv.Name,
+			Node:    node,
 		})
 	} else {
 		myLog.Errorf("[Publisher.addNode] servers %s not found", srv.Name)
@@ -229,9 +229,9 @@ func (s *Publisher) delNode(srv *registry.Service, node *registry.Node) {
 			if n.SrvNodeID == node.SrvNodeID {
 				found = true
 				rs.Nodes = append(rs.Nodes[:index], rs.Nodes[index+1:]...)
-				s.pub.Publish(&pubData{
-					srvName: srv.Name,
-					node:    node,
+				s.pub.Publish(&PubData{
+					SrvName: srv.Name,
+					Node:    node,
 				})
 				break
 			}

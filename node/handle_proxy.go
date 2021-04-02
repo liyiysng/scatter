@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/liyiysng/scatter/cluster"
+	"github.com/liyiysng/scatter/cluster/sessionpb"
 	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"github.com/liyiysng/scatter/handle"
 	nsession "github.com/liyiysng/scatter/node/session"
@@ -34,8 +35,8 @@ func newSrvHandleProxy(innerHandle handle.IHandler, clientBuild cluster.IGrpcSub
 }
 
 //! register rpc service
-func (h *srvHanleProxy) Register(recv interface{}) error {
-	err := h.innerHandle.Register(recv)
+func (h *srvHanleProxy) Register(recv interface{}, opt ...handle.RegisterOpt) error {
+	err := h.innerHandle.Register(recv, opt...)
 	if err != nil {
 		return nil
 	}
@@ -45,8 +46,8 @@ func (h *srvHanleProxy) Register(recv interface{}) error {
 }
 
 //! register named service
-func (h *srvHanleProxy) RegisterName(name string, recv interface{}) error {
-	err := h.innerHandle.RegisterName(name, recv)
+func (h *srvHanleProxy) RegisterName(name string, recv interface{}, opt ...handle.RegisterOpt) error {
+	err := h.innerHandle.RegisterName(name, recv, opt...)
 	if err != nil {
 		return err
 	}
@@ -67,8 +68,16 @@ func (h *srvHanleProxy) Call(ctx context.Context, session interface{}, serviceNa
 	if err != nil {
 		return nil, err
 	}
+
+	sinfo := &sessionpb.SessionInfo{
+		SType: sessionpb.SessionType_Transfer,
+		TransferInfo: &sessionpb.TransferInfo{
+			UID: session.(nsession.Session).GetUID(),
+		},
+	}
+
 	cres, err := client.Call(ctx, &subsrvpb.CallReq{
-		UID:         session.(nsession.Session).GetUID().(int64),
+		Sinfo:       sinfo,
 		ServiceName: serviceName,
 		MethodName:  methodName,
 		Payload:     req,
@@ -100,8 +109,16 @@ func (h *srvHanleProxy) Notify(ctx context.Context, session interface{}, service
 	if err != nil {
 		return err
 	}
+
+	sinfo := &sessionpb.SessionInfo{
+		SType: sessionpb.SessionType_Transfer,
+		TransferInfo: &sessionpb.TransferInfo{
+			UID: session.(nsession.Session).GetUID(),
+		},
+	}
+
 	cres, err := client.Notify(ctx, &subsrvpb.NotifyReq{
-		UID:         session.(nsession.Session).GetUID().(int64),
+		Sinfo:       sinfo,
 		ServiceName: serviceName,
 		MethodName:  methodName,
 		Payload:     req,
@@ -138,5 +155,9 @@ func (h *srvHanleProxy) getClient(serviceName string) (c subsrvpb.SubServiceClie
 //! 获取所有服务名
 // 支持所有服务
 func (h *srvHanleProxy) AllServiceName() []string {
-	return []string{}
+	return h.AllServiceName()
+}
+
+func (h *srvHanleProxy) AllRecv() []interface{} {
+	return h.innerHandle.AllRecv()
 }

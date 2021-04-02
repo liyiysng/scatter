@@ -9,6 +9,7 @@ import (
 	"github.com/liyiysng/scatter/handle"
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/metrics"
+	"github.com/liyiysng/scatter/node/session"
 	"github.com/liyiysng/scatter/node/textlog"
 	"github.com/olivere/elastic/v7"
 	"google.golang.org/grpc"
@@ -25,6 +26,7 @@ import (
 )
 
 var typeProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
+var typeSession = reflect.TypeOf((*session.Session)(nil)).Elem()
 
 const (
 	defaultWriteBufSize = 32 * 1024
@@ -105,9 +107,11 @@ type Options struct {
 
 	// rpc
 	// 請求類型驗證
-	reqTypeValidator func(reqType reflect.Type) error
+	reqTypeValidator func(t reflect.Type) error
 	// 回复類型驗證
-	resTypeValidator func(reqType reflect.Type) error
+	resTypeValidator func(t reflect.Type) error
+	// session类型验证
+	sessionTypeValidator func(t reflect.Type) error
 	// 可选参数
 	optArgs *handle.OptionalArgs
 
@@ -183,17 +187,23 @@ var defaultOptions = Options{
 	enableLimit:       false,
 	enableTraceDetail: true,
 	showHandleLog:     true,
-	reqTypeValidator: func(reqType reflect.Type) error {
-		if reqType.Implements(typeProtoMessage) {
+	reqTypeValidator: func(t reflect.Type) error { // proto
+		if t.Implements(typeProtoMessage) {
 			return nil
 		}
 		return handle.ErrRequstTypeError
 	},
-	resTypeValidator: func(reqType reflect.Type) error {
-		if reqType.Implements(typeProtoMessage) {
+	resTypeValidator: func(t reflect.Type) error { // proto
+		if t.Implements(typeProtoMessage) {
 			return nil
 		}
 		return handle.ErrResponseTypeError
+	},
+	sessionTypeValidator: func(t reflect.Type) error {
+		if t != typeSession && !t.Implements(typeSession) {
+			return handle.ErrSessionTypeError
+		}
+		return nil
 	},
 	readChanBufSize:  1024,
 	writeChanBufSize: 1024,

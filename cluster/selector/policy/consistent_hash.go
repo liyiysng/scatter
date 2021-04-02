@@ -79,7 +79,7 @@ func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Pick
 }
 
 type consistentHashPicker struct {
-	subConns   map[string]balancer.SubConn
+	subConns   map[string] /*node id*/ balancer.SubConn
 	srvName    string
 	consistent *hash.Consistent
 }

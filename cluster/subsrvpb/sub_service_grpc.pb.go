@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SubServiceClient interface {
 	Call(ctx context.Context, in *CallReq, opts ...grpc.CallOption) (*CallRes, error)
 	Notify(ctx context.Context, in *NotifyReq, opts ...grpc.CallOption) (*NotifyRes, error)
+	Pub(ctx context.Context, in *PubReq, opts ...grpc.CallOption) (*PubRes, error)
 }
 
 type subServiceClient struct {
@@ -47,12 +48,22 @@ func (c *subServiceClient) Notify(ctx context.Context, in *NotifyReq, opts ...gr
 	return out, nil
 }
 
+func (c *subServiceClient) Pub(ctx context.Context, in *PubReq, opts ...grpc.CallOption) (*PubRes, error) {
+	out := new(PubRes)
+	err := c.cc.Invoke(ctx, "/scatter.service.SubService/Pub", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SubServiceServer is the server API for SubService service.
 // All implementations must embed UnimplementedSubServiceServer
 // for forward compatibility
 type SubServiceServer interface {
 	Call(context.Context, *CallReq) (*CallRes, error)
 	Notify(context.Context, *NotifyReq) (*NotifyRes, error)
+	Pub(context.Context, *PubReq) (*PubRes, error)
 	mustEmbedUnimplementedSubServiceServer()
 }
 
@@ -65,6 +76,9 @@ func (UnimplementedSubServiceServer) Call(context.Context, *CallReq) (*CallRes, 
 }
 func (UnimplementedSubServiceServer) Notify(context.Context, *NotifyReq) (*NotifyRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
+}
+func (UnimplementedSubServiceServer) Pub(context.Context, *PubReq) (*PubRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Pub not implemented")
 }
 func (UnimplementedSubServiceServer) mustEmbedUnimplementedSubServiceServer() {}
 
@@ -115,6 +129,24 @@ func _SubService_Notify_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SubService_Pub_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PubReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubServiceServer).Pub(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/scatter.service.SubService/Pub",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubServiceServer).Pub(ctx, req.(*PubReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _SubService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "scatter.service.SubService",
 	HandlerType: (*SubServiceServer)(nil),
@@ -127,7 +159,11 @@ var _SubService_serviceDesc = grpc.ServiceDesc{
 			MethodName: "Notify",
 			Handler:    _SubService_Notify_Handler,
 		},
+		{
+			MethodName: "Pub",
+			Handler:    _SubService_Pub_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "cluster/sub_service.proto",
+	Metadata: "cluster/subsrvpb/sub_service.proto",
 }
