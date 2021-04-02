@@ -291,6 +291,17 @@ func (n *Node) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
 	n.gnode.RegisterService(desc, impl)
 }
 
+// Subscribe 订阅
+// 非协程安全
+func (n *Node) Subscribe(topic string, recv interface{}) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.gnode == nil {
+		panic(ErrNodeStopped)
+	}
+	return n.gnode.Subscribe(topic, recv)
+}
+
 // ServeGrpc run grpc server
 func (n *Node) ServeGrpc(lis net.Listener) error {
 	n.waitGroup.Add(1)
