@@ -59,6 +59,18 @@ func TestPub(t *testing.T) {
 				return
 			}
 			time.Sleep(time.Second * 1)
+
+			err = pub.PublishMulti(context.Background(), "foo", "Foo1", &cluster_testing.String{
+				Str: "pub test0",
+			}, &cluster_testing.String{
+				Str: "pub test1",
+			}, &cluster_testing.String{
+				Str: "pub test2",
+			})
+			if err != nil {
+				myLog.Error(err)
+				return
+			}
 		}
 	}()
 

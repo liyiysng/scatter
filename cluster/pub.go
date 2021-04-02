@@ -24,6 +24,8 @@ import (
 var (
 	// ErrorPublisherClosed 已关闭
 	ErrorPublisherClosed = errors.New("publisher closed")
+	// ErrorPubEmptyContent 发布空内容
+	ErrorPubEmptyContent = errors.New("publishe empty content")
 )
 
 type PublishOption struct {
@@ -88,10 +90,14 @@ func NewPublisher(o ...OptFunType) *Publisher {
 }
 
 // PublishMulti 发布多个
-func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, v []interface{}) error {
+func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, vs ...interface{}) error {
 
 	if p.closeEvent.HasFired() {
 		return ErrorPublisherClosed
+	}
+
+	if len(vs) == 0 {
+		return ErrorPubEmptyContent
 	}
 
 	p.topicMu.Lock()
@@ -99,6 +105,66 @@ func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, 
 	p.topicMu.Unlock()
 	if !tok || len(allNodes) == 0 { // 无订阅者
 		return nil
+	}
+
+	conn, err := p.getConn(topic)
+	if err != nil {
+		return err
+	}
+
+	perr := &PubError{}
+	perrMu := &sync.Mutex{}
+
+	wg := util.WaitGroupWrapper{}
+
+	sinfo := &sessionpb.SessionInfo{
+		SType:   sessionpb.SessionType_Pub,
+		PubInfo: &sessionpb.PubInfo{},
+	}
+
+	for _, v := range allNodes {
+		ctx = policy.WithNodeID(ctx, v)
+		wg.Wrap(func() {
+			for _, d := range vs {
+				// 是否已经是bytes
+				var err error
+				var data []byte
+				if bytesData, ok := d.([]byte); ok {
+					data = bytesData
+				} else {
+					data, err = p.codec.Marshal(d)
+				}
+
+				if err != nil {
+					perrMu.Lock()
+					perr.errs = append(perr.errs, err)
+					perrMu.Unlock()
+					continue
+				}
+
+				res, underlyingError := conn.Pub(ctx, &subsrvpb.PubReq{
+					Sinfo:   sinfo,
+					Topic:   topic,
+					Cmd:     cmd,
+					Payload: data,
+				})
+				perrMu.Lock()
+				if underlyingError != nil {
+					perr.errs = append(perr.errs, underlyingError)
+				} else {
+					if res.ErrInfo != nil {
+						perr.errs = append(perr.errs, errors.New(res.ErrInfo.Err))
+					}
+				}
+				perrMu.Unlock()
+			}
+		}, p.opt.logerr.Errorf)
+	}
+
+	wg.Wait()
+
+	if len(perr.errs) > 0 {
+		return perr
 	}
 
 	return nil
@@ -140,13 +206,14 @@ func (p *Publisher) Publish(ctx context.Context, topic string, cmd string, v int
 
 	wg := util.WaitGroupWrapper{}
 
+	sinfo := &sessionpb.SessionInfo{
+		SType:   sessionpb.SessionType_Pub,
+		PubInfo: &sessionpb.PubInfo{},
+	}
+
 	for _, v := range allNodes {
 		ctx = policy.WithNodeID(ctx, v)
 		wg.Wrap(func() {
-			sinfo := &sessionpb.SessionInfo{
-				SType:   sessionpb.SessionType_Pub,
-				PubInfo: &sessionpb.PubInfo{},
-			}
 			res, underlyingError := conn.Pub(ctx, &subsrvpb.PubReq{
 				Sinfo:   sinfo,
 				Topic:   topic,
