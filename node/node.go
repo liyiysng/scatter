@@ -692,7 +692,9 @@ func (n *Node) onMessageFinished(ctx context.Context) {
 	}
 }
 
-func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.Session)) error {
+func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.Session)) (done <-chan struct{},err error)  {
+
+	mdone := make(chan struct{})
 
 	SIDs := make([]int64, 0, 128)
 	// copy sid
@@ -703,6 +705,7 @@ func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.S
 	n.mu.Unlock()
 
 	go func() {
+		defer close(mdone)
 		for index, value := range SIDs {
 			if (index+1)%numPerSec == 0 {
 				time.Sleep(time.Second)
@@ -716,5 +719,5 @@ func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.S
 			}
 		}
 	}()
-	return nil
+	return mdone,nil
 }
