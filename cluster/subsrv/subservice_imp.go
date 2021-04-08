@@ -67,7 +67,6 @@ var argValidator = func(t reflect.Type) error {
 
 var transforSessionValidator = func(t reflect.Type) error {
 	stype := reflect.TypeOf((*session.ITransferSession)(nil)).Elem()
-	myLog.Infof("---------valid session %v", t)
 	if t != stype && !t.Implements(stype) {
 		return handle.ErrSessionTypeError
 	}
