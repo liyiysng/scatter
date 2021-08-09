@@ -46,10 +46,11 @@ func NewNodeMetricsSpec() (*CustomMetricsSpec, error) {
 
 	spec.Summaries = []*Summary{
 		{
-			Subsystem: nodeSubSystem,
-			Name:      msgProcDelay,
-			Help:      "the message process delay(ms) of node",
-			Labels:    []string{"nid", "node_name", "srv", "method"},
+			Subsystem:  nodeSubSystem,
+			Name:       msgProcDelay,
+			Objectives: map[float64]float64{0.5: 0.05, 0.7: 0.005, 0.9: 0.01, 0.99: 0.001},
+			Help:       "the message process delay(ms) of node",
+			Labels:     []string{"nid", "node_name", "srv", "method"},
 		},
 	}
 
