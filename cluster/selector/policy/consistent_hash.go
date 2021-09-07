@@ -8,6 +8,8 @@ import (
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/util/hash"
 	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/resolver"
 )
 
 type _consistentHashKeyType string
@@ -24,15 +26,51 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 }
 
 var defaultConsistentHashBuilder = &consistentHashBuilder{
-	srvConsistent: map[string]*hash.Consistent{},
+	srvConsistent: map[resolver.Target]*hash.Consistent{},
 }
 
 func newConsistentHashBuilder() balancer.Builder {
-	return common.NewBalancerBuilder(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false})
+
+	evaluator := &consistentHashConnectivityStateEvaluator{}
+
+	return common.NewBalancerBuilderWithConnectivityStateEvaluator(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, evaluator)
+}
+
+// 当所有连接状态都为READY , 聚合连接状态变为READY
+type consistentHashConnectivityStateEvaluator struct {
+	numWantToConn uint64
+	numReady      uint64 // Number of addrConns in ready state.
+	numConnecting uint64 // Number of addrConns in connecting state.
+}
+
+func (cse *consistentHashConnectivityStateEvaluator) SetReadyConn(count uint64) {
+	cse.numWantToConn = count
+}
+
+func (cse *consistentHashConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
+	// Update counters.
+	for idx, state := range []connectivity.State{oldState, newState} {
+		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
+		switch state {
+		case connectivity.Ready:
+			cse.numReady += updateVal
+		case connectivity.Connecting:
+			cse.numConnecting += updateVal
+		}
+	}
+
+	// Evaluate.
+	if cse.numReady == cse.numWantToConn {
+		return connectivity.Ready
+	}
+	if cse.numConnecting > 0 {
+		return connectivity.Connecting
+	}
+	return connectivity.TransientFailure
 }
 
 type consistentHashBuilder struct {
-	srvConsistent map[string] /*service name*/ *hash.Consistent
+	srvConsistent map[resolver.Target] /*service name*/ *hash.Consistent
 }
 
 func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Picker {
@@ -86,9 +124,9 @@ type consistentHashPicker struct {
 
 func (p *consistentHashPicker) Pick(info balancer.PickInfo) (res balancer.PickResult, err error) {
 
-	if myLog.V(logger.VTRACE) {
-		myLog.Infof("[consistentHashPicker.Pick] %v", info.FullMethodName)
-	}
+	//if myLog.V(logger.VTRACE) {
+	//	myLog.Infof("[consistentHashPicker.Pick] %v", info.FullMethodName)
+	//}
 
 	id := info.Ctx.Value(_consistentHashBindKey)
 
@@ -98,6 +136,9 @@ func (p *consistentHashPicker) Pick(info balancer.PickInfo) (res balancer.PickRe
 			return balancer.PickResult{}, err
 		}
 		if subConn, ok := p.subConns[connStr]; ok {
+			if myLog.V(logger.VTRACE) {
+				myLog.Infof("[consistentHashPicker.Pick] id:%v connStr:%s %v",id, connStr, info.FullMethodName)
+			}
 			return balancer.PickResult{SubConn: subConn}, nil
 		}
 		return balancer.PickResult{}, ErrorServerUnvaliable

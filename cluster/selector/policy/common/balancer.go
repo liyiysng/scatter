@@ -10,15 +10,31 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
+type IConnectivityStateEvaluator interface {
+	RecordTransition(oldState, newState connectivity.State) connectivity.State
+}
+
+// IAllReadyConnectivityStateEvaluator 所有连接read 则聚合状态为ready
+type IAllReadyConnectivityStateEvaluator interface {
+	IConnectivityStateEvaluator
+	SetReadyConn(count uint64)
+}
+
 // 注意:
 // 每个节点的服务不能重复
 type baseBuilder struct {
 	name          string
 	pickerBuilder PickerBuilder
 	config        Config
+	csEvltr       IConnectivityStateEvaluator
 }
 
 func (bb *baseBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions) balancer.Balancer {
+
+	if bb.csEvltr == nil {
+		bb.csEvltr = &balancer.ConnectivityStateEvaluator{}
+	}
+
 	bal := &baseBalancer{
 		cc:            cc,
 		pickerBuilder: bb.pickerBuilder,
@@ -26,7 +42,7 @@ func (bb *baseBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions) 
 		subConns:     make(map[resolver.Address]balancer.SubConn),
 		scStates:     make(map[balancer.SubConn]connectivity.State),
 		subConnsInfo: make(map[resolver.Address]*SubConnInfo),
-		csEvltr:      &balancer.ConnectivityStateEvaluator{},
+		csEvltr:      bb.csEvltr,
 		config:       bb.config,
 		target:       opt.Target,
 	}
@@ -45,7 +61,7 @@ type baseBalancer struct {
 	cc            balancer.ClientConn
 	pickerBuilder PickerBuilder
 
-	csEvltr *balancer.ConnectivityStateEvaluator
+	csEvltr IConnectivityStateEvaluator
 	state   connectivity.State
 
 	subConns     map[resolver.Address]balancer.SubConn // `attributes` is stripped from the keys of this map (the addresses)
@@ -82,6 +98,20 @@ func (b *baseBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 	if myLog.V(logger.VIMPORTENT) {
 		myLog.Info("base.baseBalancer: got new ClientConn state: ", s)
 	}
+
+	// If resolver state contains no addresses, return an error so ClientConn
+	// will trigger re-resolve. Also records this as an resolver error, so when
+	// the overall state turns transient failure, the error message will have
+	// the zero address information.
+	if len(s.ResolverState.Addresses) == 0 {
+		b.ResolverError(errors.New("produced zero addresses"))
+		return balancer.ErrBadResolverState
+	}
+
+	if ar, ok := b.csEvltr.(IAllReadyConnectivityStateEvaluator); ok {
+		ar.SetReadyConn(uint64(len(s.ResolverState.Addresses)))
+	}
+
 	// Successful resolution; clear resolver error and ensure we return nil.
 	b.resolverErr = nil
 	// addrsSet is the set converted from addrs, it's used for quick lookup of an address.
@@ -137,14 +167,7 @@ func (b *baseBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 			// The entry will be deleted in UpdateSubConnState.
 		}
 	}
-	// If resolver state contains no addresses, return an error so ClientConn
-	// will trigger re-resolve. Also records this as an resolver error, so when
-	// the overall state turns transient failure, the error message will have
-	// the zero address information.
-	if len(s.ResolverState.Addresses) == 0 {
-		b.ResolverError(errors.New("produced zero addresses"))
-		return balancer.ErrBadResolverState
-	}
+
 	return nil
 }
 
@@ -219,16 +242,30 @@ func (b *baseBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.Su
 
 	b.state = b.csEvltr.RecordTransition(oldS, s)
 
-	// Regenerate picker when one of the following happens:
-	//  - this sc entered or left ready
-	//  - the aggregated state of balancer is TransientFailure
-	//    (may need to update error message)
-	if (s == connectivity.Ready) != (oldS == connectivity.Ready) ||
-		b.state == connectivity.TransientFailure {
-		b.regeneratePicker()
+
+	if _,ok := b.csEvltr.(IAllReadyConnectivityStateEvaluator); ok{
+		// 所有子连接Read后/子连接连接失败时重新build picker
+		if b.state == connectivity.Ready || b.state == connectivity.TransientFailure{
+			b.regeneratePicker()
+		}
+	}else{
+		// Regenerate picker when one of the following happens:
+		//  - this sc entered or left ready
+		//  - the aggregated state of balancer is TransientFailure
+		//    (may need to update error message)
+		if (s == connectivity.Ready) != (oldS == connectivity.Ready) ||
+			b.state == connectivity.TransientFailure {
+			b.regeneratePicker()
+		}
 	}
 
-	b.cc.UpdateState(balancer.State{ConnectivityState: b.state, Picker: b.picker})
+	bs := balancer.State{ConnectivityState: b.state, Picker: b.picker}
+
+	if myLog.V(logger.VDEBUG) {
+		myLog.Infof("base.baseBalancer: Update ClientConnState:  %v %+v", bs , b.csEvltr)
+	}
+
+	b.cc.UpdateState(bs)
 }
 
 // Close is a nop because base balancer doesn't have internal state to clean up,

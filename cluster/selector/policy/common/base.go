@@ -45,3 +45,13 @@ func NewBalancerBuilder(name string, pb PickerBuilder, config Config) balancer.B
 		config:        config,
 	}
 }
+
+// NewBalancerBuilderWithConnectivityStateEvaluator returns a base balancer builder configured by the provided config.
+func NewBalancerBuilderWithConnectivityStateEvaluator(name string, pb PickerBuilder, config Config, stateEvaluator IConnectivityStateEvaluator) balancer.Builder {
+	return &baseBuilder{
+		name:          name,
+		pickerBuilder: pb,
+		config:        config,
+		csEvltr:       stateEvaluator,
+	}
+}
