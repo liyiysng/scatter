@@ -944,9 +944,17 @@ func (s *frontendSession) runRead() {
 			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {
 				s.opt.Logger.Errorf("read message error %v", err)
 				s.closeConn(err.Error())
+			} else if netErr , ok := err.(net.Error) ; ok {// 是否是网络错误
+				// 读消息超时
+				if netErr.Timeout() {
+					s.closeConn(fmt.Sprintf("read time out %v",netErr))
+				} else {
+					// 网络错误 关闭链接
+					s.closeConn(fmt.Sprintf("net error %v",netErr))
+				}
 			} else {
 				// io err 关闭链接
-				s.closeConn("peer close")
+				s.closeConn(fmt.Sprintf("peer close or io error %v",err))
 			}
 			return
 		}
