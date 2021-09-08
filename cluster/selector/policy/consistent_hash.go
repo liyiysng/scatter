@@ -9,7 +9,6 @@ import (
 	"github.com/liyiysng/scatter/util/hash"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/resolver"
 )
 
 type _consistentHashKeyType string
@@ -25,15 +24,26 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 	return ctx
 }
 
-var defaultConsistentHashBuilder = &consistentHashBuilder{
-	srvConsistent: map[resolver.Target]*hash.Consistent{},
-}
-
 func newConsistentHashBuilder() balancer.Builder {
 
 	evaluator := &consistentHashConnectivityStateEvaluator{}
 
 	return common.NewBalancerBuilderWithConnectivityStateEvaluator(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, evaluator)
+}
+
+// 当前服务配置信息
+var currentConfigInfo IServiceConfigInfo = nil
+
+// 服务节点配置信息
+// 区别于从 register 获取的实时节点信息, 该信息为静态配置信息
+type IServiceConfigInfo interface {
+	// 根据 target 获取节点id
+	GetServiceNode(srvName string) []string
+}
+
+// 设置 consistent 所需的服务配置信息
+func SetServiceConfigInfo(sinfo IServiceConfigInfo) {
+	currentConfigInfo = sinfo
 }
 
 // 当所有连接状态都为READY , 聚合连接状态变为READY
@@ -70,7 +80,6 @@ func (cse *consistentHashConnectivityStateEvaluator) RecordTransition(oldState, 
 }
 
 type consistentHashBuilder struct {
-	srvConsistent map[resolver.Target] /*service name*/ *hash.Consistent
 }
 
 func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Picker {
@@ -106,7 +115,20 @@ func (b *consistentHashBuilder) Build(info common.PickerBuildInfo) balancer.Pick
 		}
 		strNodeID := nodeID.(string)
 		subConns[strNodeID] = k
-		consistent.Add(strNodeID)
+
+		if currentConfigInfo == nil {
+			consistent.Add(strNodeID)
+		}
+	}
+
+	if currentConfigInfo != nil {
+		nodeIDs := currentConfigInfo.GetServiceNode(info.Target.Endpoint)
+		if len(nodeIDs) == 0 {
+			panic("[consistentHashBuilder.Build] invalid service config info")
+		}
+		for _, nodeID := range nodeIDs {
+			consistent.Add(nodeID)
+		}
 	}
 
 	return &consistentHashPicker{
@@ -137,7 +159,7 @@ func (p *consistentHashPicker) Pick(info balancer.PickInfo) (res balancer.PickRe
 		}
 		if subConn, ok := p.subConns[connStr]; ok {
 			if myLog.V(logger.VTRACE) {
-				myLog.Infof("[consistentHashPicker.Pick] id:%v connStr:%s %v",id, connStr, info.FullMethodName)
+				myLog.Infof("[consistentHashPicker.Pick] id:%v connStr:%s %v", id, connStr, info.FullMethodName)
 			}
 			return balancer.PickResult{SubConn: subConn}, nil
 		}
