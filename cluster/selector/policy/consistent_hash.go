@@ -25,10 +25,9 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 }
 
 func newConsistentHashBuilder() balancer.Builder {
-
-	evaluator := &consistentHashConnectivityStateEvaluator{}
-
-	return common.NewBalancerBuilderWithConnectivityStateEvaluator(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, evaluator)
+	return common.NewBalancerBuilderWithConnectivityStateEvaluator(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, func() common.IConnectivityStateEvaluator {
+		return &consistentHashConnectivityStateEvaluator{}
+	})
 }
 
 // 当前服务配置信息

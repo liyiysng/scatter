@@ -26,13 +26,17 @@ type baseBuilder struct {
 	name          string
 	pickerBuilder PickerBuilder
 	config        Config
-	csEvltr       IConnectivityStateEvaluator
+	evaluatorCreator     func()IConnectivityStateEvaluator
 }
 
 func (bb *baseBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions) balancer.Balancer {
 
-	if bb.csEvltr == nil {
-		bb.csEvltr = &balancer.ConnectivityStateEvaluator{}
+	var csEvltr IConnectivityStateEvaluator = nil
+
+	if bb.evaluatorCreator == nil {
+		csEvltr  = &balancer.ConnectivityStateEvaluator{}
+	}else{
+		csEvltr = bb.evaluatorCreator()
 	}
 
 	bal := &baseBalancer{
@@ -42,7 +46,7 @@ func (bb *baseBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions) 
 		subConns:     make(map[resolver.Address]balancer.SubConn),
 		scStates:     make(map[balancer.SubConn]connectivity.State),
 		subConnsInfo: make(map[resolver.Address]*SubConnInfo),
-		csEvltr:      bb.csEvltr,
+		csEvltr:      csEvltr,
 		config:       bb.config,
 		target:       opt.Target,
 	}
