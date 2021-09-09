@@ -14,6 +14,8 @@ type tcpConn struct {
 	net.Conn
 	bufIO *bufio.ReadWriter
 	opt   MsgConnOption
+	readTotal int64
+	writeTotal int64
 }
 
 // NewTCPMsgConn 创建一个tcp消息链接
@@ -40,6 +42,15 @@ func (c *tcpConn) GetSID() int64 {
 	return c.opt.SID
 }
 
+// 当前读取字节数总量
+func (c *tcpConn)GetCurrentReadTotalBytes() int64{
+	return c.readTotal;
+}
+// 当前写字节数总量
+func (c *tcpConn)GetCurrentWirteTotalBytes() int64{
+	return c.writeTotal;
+}
+
 func (c *tcpConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt, err error) {
 
 	//记录读取字节数
@@ -48,6 +59,7 @@ func (c *tcpConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt
 		if c.opt.ReadCountReport != nil {
 			c.opt.ReadCountReport(c, rdCount)
 		}
+		c.readTotal += int64(rdCount)
 	}()
 
 	p := message.PackagePoolGet()
@@ -100,6 +112,7 @@ func (c *tcpConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) 
 	if c.opt.WriteCountReport != nil {
 		c.opt.WriteCountReport(c, wLen)
 	}
+	c.writeTotal += int64(wLen)
 
 	return nil
 }

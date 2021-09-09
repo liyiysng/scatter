@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
 	"github.com/gorilla/websocket"
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/ratelimit"
@@ -17,6 +16,8 @@ type wsConn struct {
 	opt     MsgConnOption
 	rdBuket *ratelimit.Bucket
 	wrBuket *ratelimit.Bucket
+	readTotal int64
+	writeTotal int64
 }
 
 // NewWSConn 创建ws链接
@@ -56,6 +57,15 @@ func (c *wsConn) GetSID() int64 {
 	return c.opt.SID
 }
 
+// 当前读取字节数总量
+func (c *wsConn)GetCurrentReadTotalBytes() int64{
+	return c.readTotal;
+}
+// 当前写字节数总量
+func (c *wsConn)GetCurrentWirteTotalBytes() int64{
+	return c.writeTotal;
+}
+
 func (c *wsConn) Flush() error {
 	return nil
 }
@@ -67,6 +77,7 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt,
 		if c.opt.ReadCountReport != nil {
 			c.opt.ReadCountReport(c, rdCount)
 		}
+		c.readTotal += int64(rdCount)
 	}()
 
 	p := message.PackagePoolGet()
@@ -139,9 +150,11 @@ func (c *wsConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) e
 		return err
 	}
 
+	wcount := len(writeBuffer.Bytes())
 	if c.opt.WriteCountReport != nil {
-		c.opt.WriteCountReport(c, len(writeBuffer.Bytes()))
+		c.opt.WriteCountReport(c, wcount)
 	}
+	c.writeTotal += int64(wcount)
 
 	return nil
 }

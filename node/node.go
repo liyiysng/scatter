@@ -604,6 +604,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		MaxMsgCacheNum:    3,
 		KickTimeout:       time.Second,
 		TimerResolution:   time.Second,
+		ShowMsgRWBytes:		n.opts.showMsgRWBytes,
 	})
 
 	if n.opts.Logger.V(logger.VDEBUG) {

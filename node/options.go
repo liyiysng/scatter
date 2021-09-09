@@ -126,6 +126,9 @@ type Options struct {
 
 	// grpc 配置
 	grpcOpts []grpc.ServerOption
+
+	// 是否显示消息处理字节数
+	showMsgRWBytes bool
 }
 
 func (o *Options) validate() error {
@@ -393,6 +396,16 @@ func NOptWithSubSrvValidator(f func(srvName string) bool) IOption {
 func NOptWithGrpcOpts(gopt ...grpc.ServerOption) IOption {
 	return newFuncServerOption(func(o *Options) {
 		o.grpcOpts = append(o.grpcOpts, gopt...)
+	})
+}
+
+// NOptWithShowMsgRWBytes 是否显示消息处理字节
+func NOptWithShowMsgRWBytes(show bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.showMsgRWBytes = show
 	})
 }
 

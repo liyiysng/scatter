@@ -63,4 +63,8 @@ type MsgConn interface {
 	Flush() error
 	// 关闭链接
 	Close() error
+	// 当前读取字节数总量
+	GetCurrentReadTotalBytes() int64
+	// 当前写字节数总量
+	GetCurrentWirteTotalBytes() int64
 }

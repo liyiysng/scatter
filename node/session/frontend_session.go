@@ -61,9 +61,16 @@ type Option struct {
 
 	// 计时器分辨率
 	TimerResolution time.Duration
+
+	// 是否显示消息处理字节
+	ShowMsgRWBytes bool
 }
 
 type msgCtx struct {
+	// 该消息读取字节数
+	readBytes int64
+	// 该消息写出字节数
+	writeBytes int64
 	// request , notify , heartbeat , handshake...
 	msgRead message.Message
 	// reponse , push , heatbeatact , handshakeact...
@@ -893,12 +900,16 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 	var err error
 
 	s.connMu.Lock()
+	beginWriteTotalBytes := s.conn.GetCurrentWirteTotalBytes()
 	if !s.connClosed {
 		err = s.conn.WriteNextMessage(mctx.msgWrite, mctx.popt)
 	} else {
 		err = fmt.Errorf("%v message:{%v}", ErrSessionClosed, mctx.msgWrite)
 	}
+	endWirteTotalBytes := s.conn.GetCurrentWirteTotalBytes()
 	s.connMu.Unlock()
+
+	mctx.writeBytes = endWirteTotalBytes - beginWriteTotalBytes;
 
 	s.finishMsg(mctx, nil)
 	if err != nil {
@@ -919,6 +930,20 @@ func (s *frontendSession) finishMsg(mctx *msgCtx, err error) {
 		s.opt.OnMsgFinish(mctx.ctx)
 	}
 
+	if s.opt.ShowMsgRWBytes{
+		sb := strings.Builder{}
+		if mctx.msgRead != nil{
+			sb.WriteString("read message [")
+			sb.WriteString(mctx.msgRead.GetService())
+			sb.WriteString(fmt.Sprintf("] bytes [%d] ,",mctx.readBytes))
+		}
+		if mctx.msgWrite != nil{
+			sb.WriteString("wirte message [")
+			sb.WriteString(mctx.msgWrite.GetService())
+			sb.WriteString(fmt.Sprintf("] bytes [%d]",mctx.writeBytes))
+		}
+		s.opt.Logger.Infof(sb.String())
+	}
 }
 
 func (s *frontendSession) runRead() {
@@ -938,6 +963,8 @@ func (s *frontendSession) runRead() {
 		if s.rateLimt != nil {
 			s.rateLimt.Wait(1)
 		}
+
+		beginReadTotalBytes := s.conn.GetCurrentReadTotalBytes()
 
 		msg, popt, err := s.conn.ReadNextMessage()
 		if err != nil {
@@ -961,6 +988,7 @@ func (s *frontendSession) runRead() {
 
 		mctx := getMsgCtx(s.opt.EnableTraceDetail, popt)
 		mctx.msgRead = msg
+		mctx.readBytes = s.conn.GetCurrentReadTotalBytes() - beginReadTotalBytes // 记录改消息字节数
 
 		// 消息存活时间
 		if s.opt.MsgMaxLiveTime != 0 {
