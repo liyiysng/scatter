@@ -122,7 +122,7 @@ func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, 
 		PubInfo: &sessionpb.PubInfo{},
 	}
 
-	for nid, _ := range allNodes {
+	for nid := range allNodes {
 		ctxNode := policy.WithNodeID(ctx, nid)
 		wg.Wrap(func() {
 			for _, d := range vs {
@@ -210,7 +210,7 @@ func (p *Publisher) Publish(ctx context.Context, topic string, cmd string, v int
 		SType:   sessionpb.SessionType_Pub,
 		PubInfo: &sessionpb.PubInfo{},
 	}
-	for nid, _ := range allNodes {
+	for nid := range allNodes {
 		ctxNode := policy.WithNodeID(ctx, nid)
 		wg.Wrap(func() {
 			res, underlyingError := conn.Pub(ctxNode, &subsrvpb.PubReq{
@@ -264,31 +264,32 @@ func (p *Publisher) getConn(topic string) (subsrvpb.SubServiceClient, error) {
 //更新topic所属节点
 func (p *Publisher) updateTopicNodes() {
 	nodesWithSubSrv := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
-		if srv.Name == subsrv.SubSrvGrpcName { // 子服务
-			return true
-		}
-		return false
+		return srv.Name == subsrv.SubSrvGrpcName // 子服务
 	})
 
-	allTopicNodes := map[string /*subsrv name*/]map[string]struct{}{} /*node ids*/
+	allTopicNodes := map[string] /*subsrv name*/ map[string]struct{}{} /*node ids*/
 
 	for _, n := range nodesWithSubSrv {
 		//获取字服务
 		hsrvs, err := subsrv.GetSubSrvFromMeta(n.Metadata)
 		if err != nil {
 			p.opt.logerr.Errorf("[Publisher.run] node meta error %v", err)
-			return;
+			return
 		}
-		if len(hsrvs) == 0{
+		if len(hsrvs) == 0 {
 			continue
 		}
 
 		nid, _, err := selector.GetServiceNameAndNodeID(n.SrvNodeID)
+		if err != nil {
+			myLog.Error("[Publisher.updateTopicNodes] %v", err)
+			continue
+		}
 
 		for _, topicName := range hsrvs {
-			if nids , ok := allTopicNodes[topicName]; ok{
+			if nids, ok := allTopicNodes[topicName]; ok {
 				nids[nid] = struct{}{}
-			}else {
+			} else {
 				allTopicNodes[topicName] = map[string]struct{}{nid: {}}
 			}
 		}
@@ -297,7 +298,7 @@ func (p *Publisher) updateTopicNodes() {
 	// copy all topic name
 	allTopics := []string{}
 	for s := range allTopicNodes {
-		allTopics = append(allTopics,s)
+		allTopics = append(allTopics, s)
 	}
 
 	// update
@@ -307,9 +308,9 @@ func (p *Publisher) updateTopicNodes() {
 
 	// touch connection
 	for _, topicName := range allTopics {
-		_,err := p.getConn(topicName)
-		if err != nil{
-			myLog.Error("[Publisher.updateTopicNodes] touch connection error %v",err)
+		_, err := p.getConn(topicName)
+		if err != nil {
+			myLog.Error("[Publisher.updateTopicNodes] touch connection error %v", err)
 		}
 	}
 }
