@@ -210,11 +210,10 @@ func (p *Publisher) Publish(ctx context.Context, topic string, cmd string, v int
 		SType:   sessionpb.SessionType_Pub,
 		PubInfo: &sessionpb.PubInfo{},
 	}
-
 	for _, v := range allNodes {
-		ctx = policy.WithNodeID(ctx, v)
+		ctxNode := policy.WithNodeID(ctx, v)
 		wg.Wrap(func() {
-			res, underlyingError := conn.Pub(ctx, &subsrvpb.PubReq{
+			res, underlyingError := conn.Pub(ctxNode, &subsrvpb.PubReq{
 				Sinfo:   sinfo,
 				Topic:   topic,
 				Cmd:     cmd,
