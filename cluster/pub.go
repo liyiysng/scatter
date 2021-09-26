@@ -59,7 +59,7 @@ type Publisher struct {
 	clientBuilder *GrpcClient
 	closeEvent    *util.Event
 
-	topicNodes map[string][]string
+	topicNodes map[string]map[string]struct{}
 	topicMu    sync.Mutex
 
 	wg util.WaitGroupWrapper
@@ -82,7 +82,7 @@ func NewPublisher(o ...OptFunType) *Publisher {
 		clitents:      make(map[string] /*topic*/ subsrvpb.SubServiceClient),
 		clientBuilder: NewGrpcClient(OptGrpcClientWithLogger(opt.logerr)),
 		closeEvent:    util.NewEvent(),
-		topicNodes:    make(map[string][]string),
+		topicNodes:    make(map[string]map[string]struct{}),
 		codec:         encoding.GetCodec("proto"),
 	}
 	ret.wg.Wrap(ret.run, opt.logerr.Errorf)
@@ -122,8 +122,8 @@ func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, 
 		PubInfo: &sessionpb.PubInfo{},
 	}
 
-	for _, v := range allNodes {
-		ctx = policy.WithNodeID(ctx, v)
+	for nid, _ := range allNodes {
+		ctxNode := policy.WithNodeID(ctx, nid)
 		wg.Wrap(func() {
 			for _, d := range vs {
 				// 是否已经是bytes
@@ -142,7 +142,7 @@ func (p *Publisher) PublishMulti(ctx context.Context, topic string, cmd string, 
 					continue
 				}
 
-				res, underlyingError := conn.Pub(ctx, &subsrvpb.PubReq{
+				res, underlyingError := conn.Pub(ctxNode, &subsrvpb.PubReq{
 					Sinfo:   sinfo,
 					Topic:   topic,
 					Cmd:     cmd,
@@ -210,8 +210,8 @@ func (p *Publisher) Publish(ctx context.Context, topic string, cmd string, v int
 		SType:   sessionpb.SessionType_Pub,
 		PubInfo: &sessionpb.PubInfo{},
 	}
-	for _, v := range allNodes {
-		ctxNode := policy.WithNodeID(ctx, v)
+	for nid, _ := range allNodes {
+		ctxNode := policy.WithNodeID(ctx, nid)
 		wg.Wrap(func() {
 			res, underlyingError := conn.Pub(ctxNode, &subsrvpb.PubReq{
 				Sinfo:   sinfo,
@@ -261,11 +261,64 @@ func (p *Publisher) getConn(topic string) (subsrvpb.SubServiceClient, error) {
 	return conn, nil
 }
 
+//更新topic所属节点
+func (p *Publisher) updateTopicNodes() {
+	nodesWithSubSrv := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
+		if srv.Name == subsrv.SubSrvGrpcName { // 子服务
+			return true
+		}
+		return false
+	})
+
+	allTopicNodes := map[string /*subsrv name*/]map[string]struct{}{} /*node ids*/
+
+	for _, n := range nodesWithSubSrv {
+		//获取字服务
+		hsrvs, err := subsrv.GetSubSrvFromMeta(n.Metadata)
+		if err != nil {
+			p.opt.logerr.Errorf("[Publisher.run] node meta error %v", err)
+			return;
+		}
+		if len(hsrvs) == 0{
+			continue
+		}
+
+		nid, _, err := selector.GetServiceNameAndNodeID(n.SrvNodeID)
+
+		for _, topicName := range hsrvs {
+			if nids , ok := allTopicNodes[topicName]; ok{
+				nids[nid] = struct{}{}
+			}else {
+				allTopicNodes[topicName] = map[string]struct{}{nid: {}}
+			}
+		}
+	}
+
+	// copy all topic name
+	allTopics := []string{}
+	for s := range allTopicNodes {
+		allTopics = append(allTopics,s)
+	}
+
+	// update
+	p.topicMu.Lock()
+	p.topicNodes = allTopicNodes
+	p.topicMu.Unlock()
+
+	// touch connection
+	for _, topicName := range allTopics {
+		_,err := p.getConn(topicName)
+		if err != nil{
+			myLog.Error("[Publisher.updateTopicNodes] touch connection error %v",err)
+		}
+	}
+}
+
 func (p *Publisher) run() {
 	srvChan := publisher.GetPublisher().Subscribe(func(srvName string, node *registry.Node) bool {
 		return srvName == subsrv.SubSrvGrpcName
 	})
-
+	p.updateTopicNodes()
 	defer publisher.GetPublisher().Evict(srvChan)
 	for {
 		select {
@@ -274,62 +327,13 @@ func (p *Publisher) run() {
 				p.clientBuilder.Close()
 				return
 			}
-		case changeData, ok := <-srvChan:
+		case _, ok := <-srvChan:
 			{
 				if !ok {
 					p.opt.logerr.Error("[Publisher.run] subcrible closed")
 					return
 				}
-
-				changedSubscribes, err := subsrv.GetSubSrvFromMeta((changeData.(*publisher.PubData)).Node.Metadata)
-				if err != nil {
-					p.opt.logerr.Errorf("[Publisher.run] %v", err)
-					continue
-				}
-
-				if len(changedSubscribes) == 0 {
-					continue
-				}
-
-				for _, changed := range changedSubscribes {
-					nodes := publisher.GetPublisher().FindAllNodes(func(srv *registry.Service, node *registry.Node) bool {
-						if srv.Name == subsrv.SubSrvGrpcName { // 子服务
-							hsrvs, err := subsrv.GetSubSrvFromMeta(node.Metadata)
-							if err != nil {
-								p.opt.logerr.Errorf("[Publisher.run] node meta error %v", err)
-								return false
-							}
-							found := false
-							for _, h := range hsrvs {
-								if h == changed {
-									found = true
-									break
-								}
-							}
-							return found
-						}
-						return false
-					})
-
-					// update
-					p.topicMu.Lock()
-					if len(nodes) == 0 { // 该主题的所有订阅者都已关闭
-						p.topicNodes[changed] = []string{}
-					} else {
-						nodeIDs := []string{}
-						for _, n := range nodes {
-							nid, _, err := selector.GetServiceNameAndNodeID(n.SrvNodeID)
-							if err != nil {
-								p.opt.logerr.Error(err)
-								continue
-							}
-							nodeIDs = append(nodeIDs, nid)
-						}
-						p.topicNodes[changed] = nodeIDs
-					}
-					p.topicMu.Unlock()
-				}
-
+				p.updateTopicNodes()
 			}
 		}
 	}
