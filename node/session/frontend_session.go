@@ -158,7 +158,7 @@ type frontendSession struct {
 
 	conn       conn.MsgConn
 	connClosed bool
-	why string
+	why        string
 	connMu     sync.Mutex
 
 	readChan chan *msgCtx // request chan  ,  ensure request sequence
@@ -282,7 +282,7 @@ func (s *frontendSession) PeerAddr() net.Addr {
 func (s *frontendSession) Push(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
-		return newSessionClosedError(s.GetSID(),"close event has fired")
+		return newSessionClosedError(s.GetSID(), "close event has fired")
 	}
 
 	var err error
@@ -339,7 +339,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.writeChanClosed {
-		return newSessionClosedError(s.GetSID(),"write chan closed")
+		return newSessionClosedError(s.GetSID(), "write chan closed")
 	}
 
 	select {
@@ -354,7 +354,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 		}
 	case <-s.closeEvent.Done():
 		{
-			closeError := newSessionClosedError(s.GetSID(),"close event has fired")
+			closeError := newSessionClosedError(s.GetSID(), "close event has fired")
 			s.finishMsg(mctx, closeError)
 			return closeError
 		}
@@ -364,7 +364,7 @@ func (s *frontendSession) push(mctx *msgCtx) error {
 func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interface{}, timeout time.Duration, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
-		return newSessionClosedError(s.GetSID(),"close event has fired")
+		return newSessionClosedError(s.GetSID(), "close event has fired")
 	}
 
 	// 判定发送数据是否已经序列化
@@ -406,7 +406,7 @@ func (s *frontendSession) PushTimeout(ctx context.Context, cmd string, v interfa
 func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v interface{}, popt ...message.IPacketOption) error {
 
 	if s.closeEvent.HasFired() {
-		return newSessionClosedError(s.GetSID(),"close event has fired")
+		return newSessionClosedError(s.GetSID(), "close event has fired")
 	}
 
 	// 判定发送数据是否已经序列化
@@ -459,7 +459,7 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.writeChanClosed {
-		return newSessionClosedError(s.GetSID(),"write chan closed")
+		return newSessionClosedError(s.GetSID(), "write chan closed")
 	}
 
 	select {
@@ -469,7 +469,7 @@ func (s *frontendSession) PushImmediately(ctx context.Context, cmd string, v int
 		}
 	case <-s.closeEvent.Done():
 		{
-			closeErr := newSessionClosedError(s.GetSID(),"close event fired")
+			closeErr := newSessionClosedError(s.GetSID(), "close event fired")
 			s.finishMsg(mctx, closeErr)
 			return closeErr
 		}
@@ -493,7 +493,7 @@ func (s *frontendSession) Closed() bool {
 
 func (s *frontendSession) Kick() error {
 	if s.closeEvent.HasFired() {
-		return newSessionClosedError(s.GetSID(),"close event fired")
+		return newSessionClosedError(s.GetSID(), "close event fired")
 	}
 
 	mctx := getMsgCtx(s.opt.EnableTraceDetail, message.DEFAULTPOPT)
@@ -649,6 +649,7 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		{
 			err := s.handleNotify(mctx, srvHandler)
 			if err != nil {
+				s.finishMsg(mctx, err)
 				return err
 			}
 			s.finishMsg(mctx, nil)
@@ -829,7 +830,7 @@ func (s *frontendSession) sendWrite(mctx *msgCtx) error {
 		}
 	case <-s.closeEvent.Done():
 		{
-			return newSessionClosedError(s.GetSID(),"close event fired")
+			return newSessionClosedError(s.GetSID(), "close event fired")
 		}
 	}
 }
@@ -840,9 +841,9 @@ func (s *frontendSession) runWrite() {
 
 	defer func() {
 		s.Close()
-		if err != nil{
+		if err != nil {
 			s.closeConn(err.Error())
-		}else{
+		} else {
 			// 正常关闭
 			s.closeConn("normal close")
 		}
@@ -896,13 +897,13 @@ func (s *frontendSession) flush() error {
 	if !s.connClosed {
 		err = s.conn.Flush()
 	} else {
-		err = newSessionClosedError(s.GetSID(),s.why)
+		err = newSessionClosedError(s.GetSID(), s.why)
 	}
 	s.connMu.Unlock()
 	return err
 }
 
-func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error{
+func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error {
 	var err error = nil
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
@@ -911,10 +912,10 @@ func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error{
 	if !s.connClosed {
 		err = s.conn.WriteNextMessage(mctx.msgWrite, mctx.popt)
 	} else {
-		err = newSessionClosedError(s.GetSID(),s.why)
+		err = newSessionClosedError(s.GetSID(), s.why)
 	}
 	endWirteTotalBytes := s.conn.GetCurrentWirteTotalBytes()
-	mctx.writeBytes = endWirteTotalBytes - beginWriteTotalBytes;
+	mctx.writeBytes = endWirteTotalBytes - beginWriteTotalBytes
 	return err
 }
 
@@ -923,11 +924,12 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 		panic("nil wirte msg")
 	}
 	err := s.writeMsgInternal(mctx)
-	s.finishMsg(mctx, err)
 	if err != nil {
-		return err
+		s.finishMsg(mctx, err)
+	} else {
+		s.finishMsg(mctx, nil)
 	}
-	return nil
+	return err
 }
 
 func (s *frontendSession) finishMsg(mctx *msgCtx, err error) {
@@ -942,17 +944,17 @@ func (s *frontendSession) finishMsg(mctx *msgCtx, err error) {
 		s.opt.OnMsgFinish(mctx.ctx)
 	}
 
-	if s.opt.ShowMsgRWBytes{
+	if s.opt.ShowMsgRWBytes {
 		sb := strings.Builder{}
-		if mctx.msgRead != nil{
+		if mctx.msgRead != nil {
 			sb.WriteString("read message [")
 			sb.WriteString(mctx.msgRead.GetService())
-			sb.WriteString(fmt.Sprintf("] bytes [%d] ,",mctx.readBytes))
+			sb.WriteString(fmt.Sprintf("] bytes [%d] ,", mctx.readBytes))
 		}
-		if mctx.msgWrite != nil{
+		if mctx.msgWrite != nil {
 			sb.WriteString("wirte message [")
 			sb.WriteString(mctx.msgWrite.GetService())
-			sb.WriteString(fmt.Sprintf("] bytes [%d]",mctx.writeBytes))
+			sb.WriteString(fmt.Sprintf("] bytes [%d]", mctx.writeBytes))
 		}
 		s.opt.Logger.Infof(sb.String())
 	}
@@ -981,24 +983,24 @@ func (s *frontendSession) runRead() {
 		msg, popt, err := s.conn.ReadNextMessage()
 		if err != nil {
 			if err != io.EOF && err != io.ErrUnexpectedEOF && !strings.Contains(err.Error(), "use of closed network connection") {
-				s.opt.Logger.Errorf("session %d read message error %v",s.GetSID(), err)
+				s.opt.Logger.Errorf("session %d read message error %v", s.GetSID(), err)
 				s.closeConn(err.Error())
-			} else if netErr , ok := err.(net.Error) ; ok {// 是否是网络错误
+			} else if netErr, ok := err.(net.Error); ok { // 是否是网络错误
 				// 读消息超时
 				if netErr.Timeout() {
-					s.closeConn(fmt.Sprintf("read time out %v",netErr))
+					s.closeConn(fmt.Sprintf("read time out %v", netErr))
 				} else {
 					// 网络错误 关闭链接
-					s.closeConn(fmt.Sprintf("net error %v",netErr))
+					s.closeConn(fmt.Sprintf("net error %v", netErr))
 				}
 			} else {
-				if err == io.EOF{
+				if err == io.EOF {
 					s.closeConn("peer closed")
-				}else if err == io.ErrUnexpectedEOF{
+				} else if err == io.ErrUnexpectedEOF {
 					s.closeConn(io.ErrUnexpectedEOF.Error())
-				}else{
+				} else {
 					// io err 关闭链接
-					s.closeConn(fmt.Sprintf("io error %v",err))
+					s.closeConn(fmt.Sprintf("io error %v", err))
 				}
 			}
 			return
@@ -1043,14 +1045,12 @@ func (s *frontendSession) drainWrite() {
 		if err == nil { // 无错误,继续发送
 			err = s.writeMsg(mctx)
 			if err != nil {
-				s.finishMsg(mctx, err)
-				s.opt.Logger.Errorf("session %d write message error %v", s.GetSID() , err)
+				s.opt.Logger.Errorf("session %d write message error %v", s.GetSID(), err)
 				continue
 			}
 			err = s.flush()
 			if err != nil {
-				s.finishMsg(mctx, err)
-				s.opt.Logger.Errorf("session %d flush message error %v",s.GetSID() , err)
+				s.opt.Logger.Errorf("session %d flush message error %v", s.GetSID(), err)
 				continue
 			}
 		} else { // 写消息错误 , 丢弃剩余消息
@@ -1079,7 +1079,7 @@ func (s *frontendSession) closeConn(why string) {
 	}
 
 	if s.opt.Logger.V(logger.VDEBUG) {
-		s.opt.Logger.Infof("%d close conn caused by %s", s.GetSID() ,why)
+		s.opt.Logger.Infof("%d close conn caused by %s", s.GetSID(), why)
 	}
 
 	// 关闭链接
