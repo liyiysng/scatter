@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/liyiysng/scatter/node/message"
 	"github.com/liyiysng/scatter/ratelimit"
@@ -13,11 +15,24 @@ import (
 
 type wsConn struct {
 	*websocket.Conn
-	opt     MsgConnOption
-	rdBuket *ratelimit.Bucket
-	wrBuket *ratelimit.Bucket
-	readTotal int64
+	opt        MsgConnOption
+	rdBuket    *ratelimit.Bucket
+	wrBuket    *ratelimit.Bucket
+	readTotal  int64
 	writeTotal int64
+}
+
+// CreateWSConn 创建ws链接
+func CreateWSConn(url url.URL, opt MsgConnOption) (MsgConn, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	ret := &wsConn{
+		Conn: conn,
+		opt:  opt,
+	}
+	return ret, nil
 }
 
 // NewWSConn 创建ws链接
@@ -58,12 +73,13 @@ func (c *wsConn) GetSID() int64 {
 }
 
 // 当前读取字节数总量
-func (c *wsConn)GetCurrentReadTotalBytes() int64{
-	return c.readTotal;
+func (c *wsConn) GetCurrentReadTotalBytes() int64 {
+	return c.readTotal
 }
+
 // 当前写字节数总量
-func (c *wsConn)GetCurrentWirteTotalBytes() int64{
-	return c.writeTotal;
+func (c *wsConn) GetCurrentWirteTotalBytes() int64 {
+	return c.writeTotal
 }
 
 func (c *wsConn) Flush() error {
