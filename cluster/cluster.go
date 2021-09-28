@@ -17,7 +17,6 @@ import (
 
 	// consul服务注册
 	"github.com/liyiysng/scatter/cluster/registry/consul"
-	_ "github.com/liyiysng/scatter/cluster/registry/consul"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"

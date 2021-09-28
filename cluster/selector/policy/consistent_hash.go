@@ -14,7 +14,7 @@ import (
 type _consistentHashKeyType string
 
 const (
-	_consistentHashName                           = "consistent_hash"
+	ConsistentHashName                            = "consistent_hash"
 	_consistentHashBindKey _consistentHashKeyType = "_consistentHashBindKey"
 )
 
@@ -25,7 +25,7 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 }
 
 func newConsistentHashBuilder() balancer.Builder {
-	return common.NewBalancerBuilderWithConnectivityStateEvaluator(_consistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, func() common.IConnectivityStateEvaluator {
+	return common.NewBalancerBuilderWithConnectivityStateEvaluator(ConsistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, func() common.IConnectivityStateEvaluator {
 		return &consistentHashConnectivityStateEvaluator{}
 	})
 }
