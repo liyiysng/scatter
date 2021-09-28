@@ -67,6 +67,10 @@ func (p *pubPicker) Pick(info balancer.PickInfo) (res balancer.PickResult, err e
 		return balancer.PickResult{}, ErrorContextNodeIDNotBind
 	}
 
+	if myLog.V(logger.VDEBUG) {
+		myLog.Infof("[pubPicker.Pick] select node %s",nodeID)
+	}
+
 	if subConn, ok := p.subConns[nodeID]; ok {
 		return balancer.PickResult{SubConn: subConn}, nil
 	}

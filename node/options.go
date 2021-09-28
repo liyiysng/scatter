@@ -187,7 +187,9 @@ var defaultOptions = Options{
 	writeTimeout:      time.Second * 5,
 	codec:             "proto",
 	compresser:        "gzip",
-	enableLimit:       false,
+	enableLimit:       true,
+	rateLimitReadBytes: 1024,
+	rateLimitWriteBytes: 1024,
 	enableTraceDetail: true,
 	showHandleLog:     true,
 	reqTypeValidator: func(t reflect.Type) error { // proto

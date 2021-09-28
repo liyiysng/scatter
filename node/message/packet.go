@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"sync"
-
 	"github.com/liyiysng/scatter/encoding"
 	"github.com/liyiysng/scatter/util"
 )
@@ -141,9 +140,7 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 	}
 
 	bufToWrite := p.Data
-
 	if length > 0 && p.PacketOpt&COMPRESS > 0 { // 压缩
-
 		compressBuf := util.BufferPoolGet()
 		defer util.BufferPoolPut(compressBuf)
 
@@ -163,7 +160,6 @@ func (p *Packet) WriteTo(w packageWriter, compresser encoding.Compressor, maxLen
 	}
 
 	lenghtToWrite := int32(len(bufToWrite))
-
 	err = w.WriteByte(byte(p.PacketOpt))
 	if err != nil {
 		return

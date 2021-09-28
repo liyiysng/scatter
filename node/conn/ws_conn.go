@@ -88,6 +88,7 @@ func (c *wsConn) ReadNextMessage() (msg message.Message, popt message.PacketOpt,
 	}
 
 	_, buf, err := c.Conn.ReadMessage()
+
 	if err != nil {
 		if werr, ok := err.(*websocket.CloseError); ok {
 			if werr.Code == websocket.CloseNormalClosure {

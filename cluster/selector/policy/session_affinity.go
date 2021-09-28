@@ -3,11 +3,12 @@ package policy
 import (
 	"context"
 	"math/rand"
+	"strings"
 	"sync/atomic"
 
-	"github.com/liyiysng/scatter/cluster/selector/policy/common"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/balancer/base"
 )
 
 type _sessionAffinityKeyType string
@@ -36,20 +37,20 @@ func WithSessionAffinity(ctx context.Context, bindFunc ConnBindFunc, getFunc Con
 }
 
 func newSessionAffinityBuilder() balancer.Builder {
-	return common.NewBalancerBuilder(_sessionAffinityName, &sessionAffinityBuilder{}, common.Config{HealthCheck: false})
+	return base.NewBalancerBuilder(_sessionAffinityName, &sessionAffinityBuilder{}, base.Config{HealthCheck: false})
 }
 
 type sessionAffinityBuilder struct {
 }
 
-func (b *sessionAffinityBuilder) Build(info common.PickerBuildInfo) balancer.Picker {
+func (b *sessionAffinityBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 
 	if myLog.V(logger.VIMPORTENT) {
 		myLog.Info("[sessionAffinityBuilder.Build]", info)
 	}
 
 	if len(info.ReadySCs) == 0 {
-		return common.NewErrPicker(balancer.ErrNoSubConnAvailable)
+		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
 	var arr []balancer.SubConn
 	for sc := range info.ReadySCs {
@@ -60,12 +61,11 @@ func (b *sessionAffinityBuilder) Build(info common.PickerBuildInfo) balancer.Pic
 		subConns: info.ReadySCs,
 		arrConns: arr,
 		next:     rand.Int63n(int64(len(info.ReadySCs))),
-		srvName:  info.Target.Endpoint,
 	}
 }
 
 type sessionAffinityPicker struct {
-	subConns map[balancer.SubConn]common.SubConnInfo
+	subConns map[balancer.SubConn]base.SubConnInfo
 	arrConns []balancer.SubConn
 	next     int64
 	srvName  string
@@ -75,6 +75,17 @@ func (p *sessionAffinityPicker) Pick(info balancer.PickInfo) (res balancer.PickR
 
 	if myLog.V(logger.VTRACE) {
 		myLog.Infof("[sessionAffinityPicker.Pick] %v", info.FullMethodName)
+	}
+
+	// 服务名可以从builder获取,但balancer.SubConn未提供相关数据
+	// base.SubConnInfo 在该版本中只提供了地址[IP]信息,未/不能 提供相关attribute和meta数据(meta和attribute不同 会导致重复链接)
+	// TODO grpc.balancer修复后 , 修改相关实现
+	if p.srvName == "" {
+		v := strings.Split(info.FullMethodName, "/")
+		if len(v) != 3 {
+			return balancer.PickResult{}, ErrorServiceFormatError
+		}
+		p.srvName = v[1]
 	}
 
 	getFunc, ok := info.Ctx.Value(_sessionAffinityGetKey).(ConnGetFunc)

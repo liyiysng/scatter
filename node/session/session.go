@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"time"
+	"fmt"
 
 	csession "github.com/liyiysng/scatter/cluster/subsrv"
 	"github.com/liyiysng/scatter/constants"
@@ -19,13 +20,27 @@ var (
 )
 
 var (
-	// ErrSessionClosed session已关闭
-	ErrSessionClosed = errors.New("session closed")
 	// ErrorPushBufferFull session push缓冲已满
 	ErrorPushBufferFull = errors.New("session push full")
 	// ErrorMsgDiscard 消息被丢弃
 	ErrorMsgDiscard = errors.New("message discard")
 )
+
+func newSessionClosedError(sid int64 , why string) error{
+	return &sessionClosedError{
+		sid: sid,
+		why: why,
+	}
+}
+
+type sessionClosedError struct {
+	why string
+	sid int64
+}
+
+func (s *sessionClosedError) Error() string {
+	return fmt.Sprintf("session %d closed : %s",s.sid,s.why)
+}
 
 // OnClose 关闭回调类型
 type OnClose func(s Session)
