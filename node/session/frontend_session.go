@@ -649,7 +649,6 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		{
 			err := s.handleNotify(mctx, srvHandler)
 			if err != nil {
-				s.finishMsg(mctx, err)
 				return err
 			}
 			s.finishMsg(mctx, nil)
