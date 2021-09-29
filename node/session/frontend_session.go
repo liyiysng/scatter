@@ -870,7 +870,7 @@ func (s *frontendSession) runWrite() {
 
 				err = s.writeMsg(mctx)
 				if err != nil {
-					s.opt.Logger.Errorf("write message error %v", err)
+					s.opt.Logger.Errorf("write message error %v" , err)
 					// io错误 关闭链接
 					err = fmt.Errorf("write io error:%v", err)
 					return
@@ -916,6 +916,11 @@ func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error {
 	}
 	endWirteTotalBytes := s.conn.GetCurrentWirteTotalBytes()
 	mctx.writeBytes = endWirteTotalBytes - beginWriteTotalBytes
+
+	if err != nil{
+		err = fmt.Errorf("{%s} {%v}",mctx.msgRead.GetService(),err)
+	}
+
 	return err
 }
 
@@ -924,11 +929,7 @@ func (s *frontendSession) writeMsg(mctx *msgCtx) error {
 		panic("nil wirte msg")
 	}
 	err := s.writeMsgInternal(mctx)
-	if err != nil {
-		s.finishMsg(mctx, err)
-	} else {
-		s.finishMsg(mctx, nil)
-	}
+	s.finishMsg(mctx, err)
 	return err
 }
 

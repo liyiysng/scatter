@@ -156,11 +156,13 @@ func (c *wsConn) WriteNextMessage(msg message.Message, popt message.PacketOpt) e
 	if err != nil {
 		return err
 	}
-	if c.opt.WriteTimeout != 0 {
-		c.SetWriteDeadline(time.Now().Add(c.opt.WriteTimeout))
-	}
+
 	if c.wrBuket != nil {
 		c.wrBuket.Wait(int64(len(writeBuffer.Bytes())))
+	}
+
+	if c.opt.WriteTimeout != 0 {
+		c.SetWriteDeadline(time.Now().Add(c.opt.WriteTimeout))
 	}
 	err = c.WriteMessage(websocket.BinaryMessage, writeBuffer.Bytes())
 	if err != nil {
