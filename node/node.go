@@ -396,7 +396,8 @@ func (n *Node) Serve(sp SocketProtcol, addr string, opts ...INodeServeOption) er
 				ReadBufferSize:      n.opts.readBufferSize,
 				WriteBufferSize:     n.opts.writeBufferSize,
 				Compresser:          n.opts.getCompressor(),
-				EnableLimit:         n.opts.enableLimit,
+				EnableWriteLimit:    n.opts.enableWriteLimit,
+				EnableReadLimit:     n.opts.enableReadLimit,
 				RateLimitReadBytes:  n.opts.rateLimitReadBytes,
 				RateLimitWriteBytes: n.opts.rateLimitWriteBytes,
 			}
@@ -604,7 +605,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		MaxMsgCacheNum:    3,
 		KickTimeout:       time.Second,
 		TimerResolution:   time.Second,
-		ShowMsgRWBytes:		n.opts.showMsgRWBytes,
+		ShowMsgRWBytes:    n.opts.showMsgRWBytes,
 	})
 
 	if n.opts.Logger.V(logger.VDEBUG) {
@@ -693,7 +694,7 @@ func (n *Node) onMessageFinished(ctx context.Context) {
 	}
 }
 
-func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.Session)) (done <-chan struct{},err error)  {
+func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.Session)) (done <-chan struct{}, err error) {
 
 	mdone := make(chan struct{})
 
@@ -720,5 +721,5 @@ func (n *Node) AddJob(numPerSec int, foreachOnlineSession func(session session.S
 			}
 		}
 	}()
-	return mdone,nil
+	return mdone, nil
 }

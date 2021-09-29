@@ -72,8 +72,10 @@ type Options struct {
 	compresser string
 	// 编码
 	codec string
-	// 限流
-	enableLimit bool
+	// 读限流
+	enableReadLimit bool
+	// 写限流
+	enableWriteLimit bool
 	// 读限流
 	rateLimitReadBytes int64
 	// 写限流
@@ -187,7 +189,8 @@ var defaultOptions = Options{
 	writeTimeout:      time.Second * 5,
 	codec:             "proto",
 	compresser:        "gzip",
-	enableLimit:       true,
+	enableReadLimit:    true,
+	enableWriteLimit:   false,
 	rateLimitReadBytes: 1024,
 	rateLimitWriteBytes: 1024,
 	enableTraceDetail: true,

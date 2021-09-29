@@ -24,10 +24,13 @@ func NewTCPMsgConn(conn net.Conn, opt MsgConnOption) MsgConn {
 	var rd io.Reader = conn
 	var wr io.Writer = conn
 
-	if opt.EnableLimit {
+	if opt.EnableReadLimit {
 		rdBuket := ratelimit.NewBucketWithQuantum(time.Second, opt.RateLimitReadBytes, opt.RateLimitReadBytes)
-		wrBuket := ratelimit.NewBucketWithQuantum(time.Second, opt.RateLimitWriteBytes, opt.RateLimitWriteBytes)
 		rd = ratelimit.Reader(rd, rdBuket)
+	}
+
+	if opt.EnableWriteLimit {
+		wrBuket := ratelimit.NewBucketWithQuantum(time.Second, opt.RateLimitWriteBytes, opt.RateLimitWriteBytes)
 		wr = ratelimit.Writer(wr, wrBuket)
 	}
 

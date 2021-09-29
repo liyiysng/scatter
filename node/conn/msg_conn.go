@@ -30,8 +30,10 @@ type MsgConnOption struct {
 	WriteBufferSize int
 	// 解压/压缩
 	Compresser encoding.Compressor
-	// 限流
-	EnableLimit bool
+	// 读限流
+	EnableReadLimit bool
+	// 写限流
+	EnableWriteLimit bool
 	// 每秒读取字节数
 	RateLimitReadBytes int64
 	// 每秒写取字节数

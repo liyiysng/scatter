@@ -61,8 +61,10 @@ func NewWSConn(w http.ResponseWriter, r *http.Request, opt MsgConnOption) (MsgCo
 		opt:  opt,
 	}
 
-	if opt.EnableLimit {
+	if opt.EnableReadLimit {
 		ret.rdBuket = ratelimit.NewBucketWithQuantum(time.Second, opt.RateLimitReadBytes, opt.RateLimitReadBytes)
+	}
+	if opt.EnableWriteLimit {
 		ret.wrBuket = ratelimit.NewBucketWithQuantum(time.Second, opt.RateLimitWriteBytes, opt.RateLimitWriteBytes)
 	}
 	return ret, nil
