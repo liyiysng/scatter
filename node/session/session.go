@@ -4,9 +4,9 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"time"
-	"fmt"
 
 	csession "github.com/liyiysng/scatter/cluster/subsrv"
 	"github.com/liyiysng/scatter/constants"
@@ -26,7 +26,13 @@ var (
 	ErrorMsgDiscard = errors.New("message discard")
 )
 
-func newSessionClosedError(sid int64 , why string) error{
+type SessionAttr string
+
+const (
+	SessionPeerInfo SessionAttr = "__session_peer_info__"
+)
+
+func newSessionClosedError(sid int64, why string) error {
 	return &sessionClosedError{
 		sid: sid,
 		why: why,
@@ -39,7 +45,7 @@ type sessionClosedError struct {
 }
 
 func (s *sessionClosedError) Error() string {
-	return fmt.Sprintf("session %d closed : %s",s.sid,s.why)
+	return fmt.Sprintf("session %d closed : %s", s.sid, s.why)
 }
 
 // OnClose 关闭回调类型
@@ -78,8 +84,8 @@ type Session interface {
 	GetCtx() context.Context
 
 	// attr 元数据
-	SetAttr(key string, v interface{})
-	GetAttr(key string) (v interface{}, ok bool)
+	SetAttr(key SessionAttr, v interface{})
+	GetAttr(key SessionAttr) (v interface{}, ok bool)
 
 	// uid
 	BindUID(uid constants.UID)

@@ -182,7 +182,7 @@ type frontendSession struct {
 	// 上次心跳时间
 	lastHeartBeat time.Time
 
-	attrs  map[string]interface{}
+	attrs  map[SessionAttr]interface{}
 	attrMu sync.Mutex
 
 	tickerMutex sync.Mutex
@@ -202,7 +202,7 @@ func NewFrontendSession(nid int64, c conn.MsgConn, opt *Option) IFrontendSession
 		writeChan:  make(chan *msgCtx, opt.WriteChanSize),
 		closeEvent: util.NewEvent(),
 		ctx:        context.Background(),
-		attrs:      make(map[string]interface{}),
+		attrs:      make(map[SessionAttr]interface{}),
 		ticker:     map[string]*sessionTicker{},
 	}
 	ret.ctx, ret.concel = context.WithCancel(ret.ctx)
@@ -250,13 +250,13 @@ func (s *frontendSession) IsUIDBind() bool {
 	return s.uid != constants.DefaultUID
 }
 
-func (s *frontendSession) SetAttr(key string, v interface{}) {
+func (s *frontendSession) SetAttr(key SessionAttr, v interface{}) {
 	s.attrMu.Lock()
 	defer s.attrMu.Unlock()
 	s.attrs[key] = v
 }
 
-func (s *frontendSession) GetAttr(key string) (v interface{}, ok bool) {
+func (s *frontendSession) GetAttr(key SessionAttr) (v interface{}, ok bool) {
 	s.attrMu.Lock()
 	defer s.attrMu.Unlock()
 	v, ok = s.attrs[key]
@@ -807,6 +807,7 @@ func (s *frontendSession) handleHandshake(mctx *msgCtx) error {
 	if s.opt.EnableTraceDetail {
 		SetReadPayloadObj(mctx.ctx, h)
 	}
+	s.SetAttr(SessionPeerInfo, h)
 
 	return nil
 }
