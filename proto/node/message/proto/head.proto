@@ -17,6 +17,7 @@ message MsgHandShake{
     string Platform = 1;
     string ClientVersion = 2;
     string BuildVersion = 3;
+    string UDID = 4; // 用户硬件设备号（b站原话：用户硬件设备号--Android和iOS都用的uuid，32位通用唯一识别码）
 }
 
 message MsgError{
