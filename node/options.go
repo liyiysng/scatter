@@ -89,6 +89,8 @@ type Options struct {
 	writeChanBufSize int
 
 	// 消息设置
+	// 消息最大存活时间
+	msgMaxLiveTime time.Duration
 
 	// trace
 	// 允许事件跟踪
@@ -216,6 +218,7 @@ var defaultOptions = Options{
 	readChanBufSize:  1024,
 	writeChanBufSize: 1024,
 	subSrvValidator:  func(srvName string) bool { return true },
+	msgMaxLiveTime:    time.Minute,
 }
 
 // IOption 设置 日志等级等....
@@ -411,6 +414,34 @@ func NOptWithShowMsgRWBytes(show bool) IOption {
 			return
 		}
 		o.showMsgRWBytes = show
+	})
+}
+
+// NOptWithMsgMaxLiveTime 消息存活时间
+func NOptWithMsgMaxLiveTime(t time.Duration) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.msgMaxLiveTime = t
+	})
+}
+// 读超时
+func NOptWithReadTimeout(t time.Duration) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.readTimeout = t
+	})
+}
+// 写超时
+func NOptWithWriteTimeout(t time.Duration) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.writeTimeout = t
 	})
 }
 

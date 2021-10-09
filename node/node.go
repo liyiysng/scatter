@@ -599,7 +599,7 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 		PushInterceptor:   nil,
 		OnMsgFinish:       n.onMessageFinished,
 		MsgHandleTimeOut:  0,
-		MsgMaxLiveTime:    time.Second * 5,
+		MsgMaxLiveTime:    n.opts.msgMaxLiveTime,
 		EnableTraceDetail: n.opts.enableTraceDetail,
 		KeepAlive:         time.Minute * 5,
 		MaxMsgCacheNum:    3,
