@@ -25,39 +25,44 @@ type IHashAffinityCtxValue interface {
 	//获取UID
 	GetUID() string
 	//绑定该节点
-	BindToNode(srvName, nid string, unbind func())
+	BindToNode(srvName, nid string) error
 }
 
 //解绑
 //用户调用
 type IHashAffinityCtxValueUnbind interface {
-	Unbind()
+	UnBind() error
 }
 
-type HashAffinityCtxValue struct {
+// 绑定uid所用服务的节点
+type INodeBinder interface {
+	BindNode(uid, srvName, nid string) error
+	UnBindNode(uid string) error
+}
+
+type hashAffinityCtxValue struct {
 	uid    string
-	unbind func()
+	binder INodeBinder
 }
 
-func NewHashAffinityCtxValue(uid string) (IHashAffinityCtxValue, IHashAffinityCtxValueUnbind) {
-	ret := &HashAffinityCtxValue{
-		uid: uid,
+func NewHashAffinityCtxValue(uid string, binder INodeBinder) (IHashAffinityCtxValue, IHashAffinityCtxValueUnbind) {
+	ret := &hashAffinityCtxValue{
+		uid:    uid,
+		binder: binder,
 	}
 	return ret, ret
 }
 
-func (h *HashAffinityCtxValue) GetUID() string {
+func (h *hashAffinityCtxValue) GetUID() string {
 	return h.uid
 }
-func (h *HashAffinityCtxValue) BindToNode(srvName, nid string, unbind func()) {
-	h.unbind = unbind
+func (h *hashAffinityCtxValue) BindToNode(srvName, nid string) error {
+	return h.binder.BindNode(h.uid, srvName, nid)
 }
-func (h *HashAffinityCtxValue) Unbind() {
-	if h.unbind != nil {
-		h.Unbind()
-	} else {
-		myLog.Error("[HashAffinityCtxValue.Unbind] not bind")
-	}
+
+func (h *hashAffinityCtxValue) UnBind() error {
+	getHashAffinityValues().RemoveAll(h.uid)
+	return h.binder.UnBindNode(h.uid)
 }
 
 // WithHashAffinityCtx 需求
@@ -68,41 +73,29 @@ func WithHashAffinityCtx(ctx context.Context, v IHashAffinityCtxValue) context.C
 
 type hashAffinityValues struct {
 	m      sync.Mutex
-	values map[string] /*srv name*/ map[string] /*uid*/ string /*node id*/
+	values map[string] /*uid*/ map[string] /*srvName*/ string /*node id*/
 }
 
 //若没有该信息则设置保存,若有该信息则返回原来的信息
-func (h *hashAffinityValues) SetNx(srvName, uid, nid string) (string, bool) {
+func (h *hashAffinityValues) SetNx(uid, srvName, nid string) (string, bool) {
 	h.m.Lock()
 	defer h.m.Unlock()
-	if uids, uok := h.values[srvName]; uok {
-		if nodeID, ok := uids[uid]; ok {
+	if srvs, uok := h.values[uid]; uok {
+		if nodeID, ok := srvs[srvName]; ok {
 			return nodeID, true
 		} else {
-			uids[uid] = nid
+			srvs[srvName] = nid
 		}
 	} else {
-		h.values[srvName] = map[string]string{uid: nid}
+		h.values[uid] = map[string]string{srvName: nid}
 	}
 	return nid, false
 }
 
-func (h *hashAffinityValues) Remove(srvName string, uid string) {
+func (h *hashAffinityValues) RemoveAll(uid string) {
 	h.m.Lock()
 	defer h.m.Unlock()
-	if uids, uok := h.values[srvName]; uok {
-		delete(uids, uid)
-	}
-}
-
-func (h *hashAffinityValues) SetValue(srvName string, uid string, nid string) {
-	h.m.Lock()
-	defer h.m.Unlock()
-	if uids, uok := h.values[srvName]; uok {
-		uids[uid] = nid
-	} else {
-		h.values[srvName] = map[string]string{uid: nid}
-	}
+	delete(h.values, uid)
 }
 
 var _hvalues *hashAffinityValues
@@ -183,12 +176,13 @@ func (p *hashAffinityPicker) Pick(info balancer.PickInfo) (res balancer.PickResu
 				return balancer.PickResult{}, err
 			}
 			// 从当前hvalues中获取已经绑定的nid , 若没有则绑定
-			nid, exists := getHashAffinityValues().SetNx(p.srvName, uid, cnid)
+			nid, exists := getHashAffinityValues().SetNx(uid, p.srvName, cnid)
 			if !exists {
 				//绑定
-				hvalue.BindToNode(p.srvName, nid, func() {
-					getHashAffinityValues().Remove(p.srvName, uid)
-				})
+				err = hvalue.BindToNode(p.srvName, nid)
+				if err != nil {
+					return balancer.PickResult{}, err
+				}
 			}
 			//确保当前nid可用
 			if conn, cok := p.subConns[nid]; cok {
