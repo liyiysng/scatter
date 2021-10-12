@@ -36,7 +36,6 @@ func init() {
 	balancer.Register(newConsistentHashBuilder())
 	balancer.Register(newP2CBuilder())
 	balancer.Register(newPubBuilder())
-	balancer.Register(newHashAffinityBuilder())
 	balancer.Register(newBackendSessionBuilder())
 }
 
