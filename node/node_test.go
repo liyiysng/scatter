@@ -101,13 +101,13 @@ func TestNodeHandShake(t *testing.T) {
 	}
 
 	msgConn := conn.NewTCPMsgConn(con, conn.MsgConnOption{
-		MaxLength:           1024 * 1024,
-		ReadTimeout:         time.Second * 2,
-		WriteTimeout:        time.Second * 2,
-		ReadBufferSize:      1024 * 1024 * 4,
-		WriteBufferSize:     1024 * 1024 * 4,
-		Compresser:          n.opts.getCompressor(),
-		EnableLimit:         n.opts.enableLimit,
+		MaxLength:       1024 * 1024,
+		ReadTimeout:     time.Second * 2,
+		WriteTimeout:    time.Second * 2,
+		ReadBufferSize:  1024 * 1024 * 4,
+		WriteBufferSize: 1024 * 1024 * 4,
+		Compresser:      n.opts.getCompressor(),
+		//EnableLimit:         n.opts.enableLimit,
 		RateLimitReadBytes:  n.opts.rateLimitReadBytes,
 		RateLimitWriteBytes: n.opts.rateLimitWriteBytes,
 	})
@@ -239,13 +239,13 @@ func createClient(n *Node) (c conn.MsgConn, err error) {
 	}
 
 	msgConn := conn.NewTCPMsgConn(con, conn.MsgConnOption{
-		MaxLength:           1024 * 1024,
-		ReadTimeout:         time.Second * 20,
-		WriteTimeout:        time.Second * 2,
-		ReadBufferSize:      1024 * 1024 * 4,
-		WriteBufferSize:     1024 * 1024 * 4,
-		Compresser:          n.opts.getCompressor(),
-		EnableLimit:         n.opts.enableLimit,
+		MaxLength:       1024 * 1024,
+		ReadTimeout:     time.Second * 20,
+		WriteTimeout:    time.Second * 2,
+		ReadBufferSize:  1024 * 1024 * 4,
+		WriteBufferSize: 1024 * 1024 * 4,
+		Compresser:      n.opts.getCompressor(),
+		//EnableLimit:         n.opts.enableLimit,
 		RateLimitReadBytes:  n.opts.rateLimitReadBytes,
 		RateLimitWriteBytes: n.opts.rateLimitWriteBytes,
 	})
