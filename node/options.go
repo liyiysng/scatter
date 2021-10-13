@@ -426,7 +426,7 @@ func NOptWithMsgMaxLiveTime(t time.Duration) IOption {
 		o.msgMaxLiveTime = t
 	})
 }
-// 读超时
+// NOptWithReadTimeout 读超时
 func NOptWithReadTimeout(t time.Duration) IOption {
 	return newFuncServerOption(func(o *Options) {
 		if o.lastError != nil {
@@ -435,7 +435,7 @@ func NOptWithReadTimeout(t time.Duration) IOption {
 		o.readTimeout = t
 	})
 }
-// 写超时
+// NOptWithWriteTimeout 写超时
 func NOptWithWriteTimeout(t time.Duration) IOption {
 	return newFuncServerOption(func(o *Options) {
 		if o.lastError != nil {
@@ -450,6 +450,7 @@ type NodeServeOption struct {
 	outerAddr string
 	certFile  string
 	keyFile   string
+	pattern string
 }
 
 // IGrpcClientOpt 客户端选项
@@ -475,6 +476,13 @@ func newFuncNodeServeOption(f func(*NodeServeOption)) INodeServeOption {
 func OptNodeServeOptionWithOuterAddr(outerAddr string) INodeServeOption {
 	return newFuncNodeServeOption(func(o *NodeServeOption) {
 		o.outerAddr = outerAddr
+	})
+}
+
+// OptNodeServeOptionWithPattern pattern
+func OptNodeServeOptionWithPattern(pattern string) INodeServeOption {
+	return newFuncNodeServeOption(func(o *NodeServeOption) {
+		o.pattern = pattern
 	})
 }
 

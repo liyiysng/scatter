@@ -56,6 +56,7 @@ var (
 type SocketProtcol string
 
 const (
+	SocketProtcolUnknown = "unknown"
 	// SocketProtcolTCP tcp 协议
 	SocketProtcolTCP SocketProtcol = "tcp"
 	// SocketProtcolWS websocket 协议
@@ -108,6 +109,17 @@ type Info struct {
 	FrontOuterAddr []string
 	FrontPattern   string
 	InnerGrpcAddr  net.Addr
+	NetProtocol SocketProtcol
+}
+
+func (i* Info)OutAddr() string {
+	addr := "unknown"
+	if i.NetProtocol == SocketProtcolWS{
+		addr = fmt.Sprintf("%s://%s/%s",string(i.NetProtocol), i.FrontOuterAddr[0], i.FrontPattern)
+	}else if i.NetProtocol == SocketProtcolTCP{
+		addr = i.FrontOuterAddr[0]
+	}
+	return addr
 }
 
 // Node represent
@@ -143,6 +155,10 @@ type Node struct {
 
 	// 标识是否服务
 	serve bool
+
+	// 前端协议
+	sp SocketProtcol
+	pattern string
 }
 
 // NewNode 新建节点
@@ -182,6 +198,8 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		startTime: time.Now(),
 		sessions:  make(map[int64]session.Session),
 		quit:      util.NewEvent(),
+		sp: SocketProtcolUnknown,
+		pattern: "",
 		gnode: cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10),
 			cluster.OptWithLogger(opts.Logger),
 			cluster.OptWithGrpcOption(opts.grpcOpts...)),
@@ -233,6 +251,8 @@ func (n *Node) GetInfo() Info {
 		FrontBindAddr:  bindAddrs,
 		FrontOuterAddr: outerAddrs,
 		InnerGrpcAddr:  n.gnode.GetAddr(),
+		NetProtocol:n.sp,
+		FrontPattern:n.pattern,
 	}
 }
 
@@ -367,6 +387,13 @@ func (n *Node) Serve(sp SocketProtcol, addr string, opts ...INodeServeOption) er
 	if opt.outerAddr == "" {
 		opt.outerAddr = addr
 	}
+
+	n.mu.Lock()
+	n.sp = sp
+	if opt.pattern != ""{
+		n.pattern = opt.pattern
+	}
+	n.mu.Unlock()
 
 	n.waitGroup.Add(1)
 	defer n.waitGroup.Done()
