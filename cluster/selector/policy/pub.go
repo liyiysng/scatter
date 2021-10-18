@@ -1,28 +1,15 @@
 package policy
 
 import (
-	"context"
-
 	"github.com/liyiysng/scatter/cluster/selector"
 	"github.com/liyiysng/scatter/cluster/selector/policy/common"
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc/balancer"
 )
 
-type _nodeIDKeyType string
-
 const (
 	_pubName                  = "pub"
-	_nodeIDKey _nodeIDKeyType = "_nodeIDKey"
 )
-
-// 指定节点ID
-type NodeIDType string
-
-// WithPubData ctx 需求
-func WithNodeID(ctx context.Context, nid string) context.Context {
-	return context.WithValue(ctx, _nodeIDKey, nid)
-}
 
 func newPubBuilder() balancer.Builder {
 	return common.NewBalancerBuilder(_pubName, &pubBuilder{}, common.Config{HealthCheck: false})

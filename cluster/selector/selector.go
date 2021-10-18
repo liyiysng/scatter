@@ -8,7 +8,7 @@ import (
 )
 
 // DefaultPolicy 缺省选择策略
-const DefaultPolicy = "round_robin"
+const DefaultPolicy = "round_robin_n"
 
 var (
 	myLog = logger.Component("selector")

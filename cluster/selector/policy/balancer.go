@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"errors"
 
 	"github.com/liyiysng/scatter/logger"
@@ -37,6 +38,7 @@ func init() {
 	balancer.Register(newP2CBuilder())
 	balancer.Register(newPubBuilder())
 	balancer.Register(newBackendSessionBuilder())
+	balancer.Register(newRoundRobinBuilder())
 }
 
 // ErrorAcceptable checks if given error is acceptable.
@@ -47,4 +49,18 @@ func ErrorAcceptable(err error) bool {
 	default:
 		return true
 	}
+}
+
+type _nodeIDKeyType string
+const _nodeIDKey _nodeIDKeyType = "_nodeIDKey"
+
+
+// 指定nid ctx 需求
+func WithNodeID(ctx context.Context, nid string) context.Context {
+	return context.WithValue(ctx, _nodeIDKey, nid)
+}
+
+func getNodeID(ctx context.Context) (nodeID string, ok bool) {
+	nodeID, ok = ctx.Value(_nodeIDKey).(string)
+	return
 }
