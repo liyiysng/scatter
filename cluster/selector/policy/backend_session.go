@@ -39,7 +39,9 @@ func getBackendSessionMgr() IBackendSessionMgr {
 }
 
 func newBackendSessionBuilder() balancer.Builder {
-	return common.NewBalancerBuilder(BackedSessionName, &backendSessionBuilder{}, common.Config{HealthCheck: false})
+	return common.NewBalancerBuilderWithConnectivityStateEvaluator(BackedSessionName, &backendSessionBuilder{}, common.Config{HealthCheck: false}, func() common.IConnectivityStateEvaluator {
+		return &allReadyConnectivityStateEvaluator{}
+	})
 }
 
 type backendSessionBuilder struct {
@@ -95,22 +97,34 @@ func (p *backendSessionPicker) Pick(info balancer.PickInfo) (res balancer.PickRe
 		myLog.Infof("[backendSessionPicker.Pick] %v", info.FullMethodName)
 	}
 
-	v := info.Ctx.Value(_backedSessionKey)
-	if v != nil {
-		if id, ok := v.(string); ok {
-			smgr := getBackendSessionMgr()
-			if smgr == nil {
-				return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] session mgr not set , call SetupBackendSessionMgr first")
-			}
-			if nid, exists := smgr.GetNID(p.srvName, id); exists {
-				//确保当前nid可用
-				if conn, cok := p.subConns[nid]; cok {
-					return balancer.PickResult{SubConn: conn}, nil
-				} else {
-					return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] node %s unavailable now please retry later", nid)
+	nodeID, ok := getNodeID(info.Ctx)
+	if ok { // specified node
+		if myLog.V(logger.VDEBUG) {
+			myLog.Infof("[backendSessionPicker.Pick] %s select specified node %s", info.FullMethodName, nodeID)
+		}
+		if subConn, ok := p.subConns[nodeID]; ok {
+			return balancer.PickResult{SubConn: subConn}, nil
+		} else {
+			return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] %s select specified node %s not found", info.FullMethodName, nodeID)
+		}
+	} else { //use backend session
+		v := info.Ctx.Value(_backedSessionKey)
+		if v != nil {
+			if id, ok := v.(string); ok {
+				smgr := getBackendSessionMgr()
+				if smgr == nil {
+					return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] session mgr not set , call SetupBackendSessionMgr first")
 				}
-			} else {
-				return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] service %s id %s backend session not found", p.srvName, id)
+				if nid, exists := smgr.GetNID(p.srvName, id); exists {
+					//确保当前nid可用
+					if conn, cok := p.subConns[nid]; cok {
+						return balancer.PickResult{SubConn: conn}, nil
+					} else {
+						return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] node %s unavailable now please retry later", nid)
+					}
+				} else {
+					return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] service %s id %s backend session not found", p.srvName, id)
+				}
 			}
 		}
 	}

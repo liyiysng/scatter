@@ -7,6 +7,7 @@ import (
 	"github.com/liyiysng/scatter/logger"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/status"
 )
 
@@ -52,8 +53,8 @@ func ErrorAcceptable(err error) bool {
 }
 
 type _nodeIDKeyType string
-const _nodeIDKey _nodeIDKeyType = "_nodeIDKey"
 
+const _nodeIDKey _nodeIDKeyType = "_nodeIDKey"
 
 // 指定nid ctx 需求
 func WithNodeID(ctx context.Context, nid string) context.Context {
@@ -63,4 +64,37 @@ func WithNodeID(ctx context.Context, nid string) context.Context {
 func getNodeID(ctx context.Context) (nodeID string, ok bool) {
 	nodeID, ok = ctx.Value(_nodeIDKey).(string)
 	return
+}
+
+// 当所有连接状态都为READY , 聚合连接状态变为READY
+type allReadyConnectivityStateEvaluator struct {
+	numWantToConn uint64
+	numReady      uint64 // Number of addrConns in ready state.
+	numConnecting uint64 // Number of addrConns in connecting state.
+}
+
+func (cse *allReadyConnectivityStateEvaluator) SetReadyConn(count uint64) {
+	cse.numWantToConn = count
+}
+
+func (cse *allReadyConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
+	// Update counters.
+	for idx, state := range []connectivity.State{oldState, newState} {
+		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
+		switch state {
+		case connectivity.Ready:
+			cse.numReady += updateVal
+		case connectivity.Connecting:
+			cse.numConnecting += updateVal
+		}
+	}
+
+	// Evaluate.
+	if cse.numReady == cse.numWantToConn {
+		return connectivity.Ready
+	}
+	if cse.numConnecting > 0 {
+		return connectivity.Connecting
+	}
+	return connectivity.TransientFailure
 }

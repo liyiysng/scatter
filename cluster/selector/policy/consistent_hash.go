@@ -8,7 +8,6 @@ import (
 	"github.com/liyiysng/scatter/logger"
 	"github.com/liyiysng/scatter/util/hash"
 	"google.golang.org/grpc/balancer"
-	"google.golang.org/grpc/connectivity"
 )
 
 type _consistentHashKeyType string
@@ -26,7 +25,7 @@ func WithConsistentHashID(ctx context.Context, ID string) context.Context {
 
 func newConsistentHashBuilder() balancer.Builder {
 	return common.NewBalancerBuilderWithConnectivityStateEvaluator(ConsistentHashName, &consistentHashBuilder{}, common.Config{HealthCheck: false}, func() common.IConnectivityStateEvaluator {
-		return &consistentHashConnectivityStateEvaluator{}
+		return &allReadyConnectivityStateEvaluator{}
 	})
 }
 
@@ -43,39 +42,6 @@ type IServiceConfigInfo interface {
 // 设置 consistent 所需的服务配置信息
 func SetServiceConfigInfo(sinfo IServiceConfigInfo) {
 	currentConfigInfo = sinfo
-}
-
-// 当所有连接状态都为READY , 聚合连接状态变为READY
-type consistentHashConnectivityStateEvaluator struct {
-	numWantToConn uint64
-	numReady      uint64 // Number of addrConns in ready state.
-	numConnecting uint64 // Number of addrConns in connecting state.
-}
-
-func (cse *consistentHashConnectivityStateEvaluator) SetReadyConn(count uint64) {
-	cse.numWantToConn = count
-}
-
-func (cse *consistentHashConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
-	// Update counters.
-	for idx, state := range []connectivity.State{oldState, newState} {
-		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
-		switch state {
-		case connectivity.Ready:
-			cse.numReady += updateVal
-		case connectivity.Connecting:
-			cse.numConnecting += updateVal
-		}
-	}
-
-	// Evaluate.
-	if cse.numReady == cse.numWantToConn {
-		return connectivity.Ready
-	}
-	if cse.numConnecting > 0 {
-		return connectivity.Connecting
-	}
-	return connectivity.TransientFailure
 }
 
 type consistentHashBuilder struct {
