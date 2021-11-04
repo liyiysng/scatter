@@ -24,7 +24,7 @@ type TestRes struct {
 
 type fooSessionType int
 
-func hookCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
+func hookCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) (cres interface{}, err error) {
 
 	beg := time.Now()
 
@@ -32,7 +32,7 @@ func hookCall(ctx context.Context, session interface{}, srv interface{}, srvName
 
 	myLog.Infof("%s.%s(req:%v) (res:%v,err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
 
-	return err
+	return res, err
 }
 
 func notifyCall(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {

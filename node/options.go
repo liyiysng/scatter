@@ -118,6 +118,9 @@ type Options struct {
 	sessionTypeValidator func(t reflect.Type) error
 	// 可选参数
 	optArgs *handle.OptionalArgs
+	// hook
+	callHook   handle.CallHookType
+	notifyHook handle.NotifyHookType
 
 	// 配置错误
 	lastError error
@@ -183,20 +186,20 @@ func (o *Options) getCodec() encoding.Codec {
 }
 
 var defaultOptions = Options{
-	writeBufferSize:   defaultWriteBufSize,
-	readBufferSize:    defaultReadBufSize,
-	maxPayloadLength:  32 * 1024,
-	connectionTimeout: 120 * time.Second,
-	readTimeout:       0,
-	writeTimeout:      time.Second * 5,
-	codec:             "proto",
-	compresser:        "gzip",
-	enableReadLimit:    true,
-	enableWriteLimit:   false,
-	rateLimitReadBytes: 1024,
+	writeBufferSize:     defaultWriteBufSize,
+	readBufferSize:      defaultReadBufSize,
+	maxPayloadLength:    32 * 1024,
+	connectionTimeout:   120 * time.Second,
+	readTimeout:         0,
+	writeTimeout:        time.Second * 5,
+	codec:               "proto",
+	compresser:          "gzip",
+	enableReadLimit:     true,
+	enableWriteLimit:    false,
+	rateLimitReadBytes:  1024,
 	rateLimitWriteBytes: 1024,
-	enableTraceDetail: true,
-	showHandleLog:     true,
+	enableTraceDetail:   true,
+	showHandleLog:       true,
 	reqTypeValidator: func(t reflect.Type) error { // proto
 		if t.Implements(typeProtoMessage) {
 			return nil
@@ -215,10 +218,12 @@ var defaultOptions = Options{
 		}
 		return nil
 	},
+	callHook:         nil,
+	notifyHook:       nil,
 	readChanBufSize:  1024,
 	writeChanBufSize: 1024,
 	subSrvValidator:  func(srvName string) bool { return true },
-	msgMaxLiveTime:    time.Minute,
+	msgMaxLiveTime:   time.Minute,
 }
 
 // IOption 设置 日志等级等....
@@ -304,6 +309,32 @@ func NOptWithOptArgs(optArgs *handle.OptionalArgs) IOption {
 			return
 		}
 		o.optArgs = optArgs
+	})
+}
+
+// NOptWithCallHook 调用钩子函数
+func NOptWithCallHook(h handle.CallHookType) IOption {
+	if h == nil {
+		panic("[NOptWithCallHook] nil param")
+	}
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.callHook = h
+	})
+}
+
+// NOptWithNotifyHook 通知钩子函数
+func NOptWithNotifyHook(h handle.NotifyHookType) IOption {
+	if h == nil {
+		panic("[NOptWithNotifyHook] nil param")
+	}
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.notifyHook = h
 	})
 }
 
@@ -426,6 +457,7 @@ func NOptWithMsgMaxLiveTime(t time.Duration) IOption {
 		o.msgMaxLiveTime = t
 	})
 }
+
 // NOptWithReadTimeout 读超时
 func NOptWithReadTimeout(t time.Duration) IOption {
 	return newFuncServerOption(func(o *Options) {
@@ -435,6 +467,7 @@ func NOptWithReadTimeout(t time.Duration) IOption {
 		o.readTimeout = t
 	})
 }
+
 // NOptWithWriteTimeout 写超时
 func NOptWithWriteTimeout(t time.Duration) IOption {
 	return newFuncServerOption(func(o *Options) {
@@ -450,7 +483,7 @@ type NodeServeOption struct {
 	outerAddr string
 	certFile  string
 	keyFile   string
-	pattern string
+	pattern   string
 }
 
 // IGrpcClientOpt 客户端选项

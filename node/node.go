@@ -109,14 +109,14 @@ type Info struct {
 	FrontOuterAddr []string
 	FrontPattern   string
 	InnerGrpcAddr  net.Addr
-	NetProtocol SocketProtcol
+	NetProtocol    SocketProtcol
 }
 
-func (i* Info)OutAddr() string {
+func (i *Info) OutAddr() string {
 	addr := "unknown"
-	if i.NetProtocol == SocketProtcolWS{
-		addr = fmt.Sprintf("%s://%s/%s",string(i.NetProtocol), i.FrontOuterAddr[0], i.FrontPattern)
-	}else if i.NetProtocol == SocketProtcolTCP{
+	if i.NetProtocol == SocketProtcolWS {
+		addr = fmt.Sprintf("%s://%s/%s", string(i.NetProtocol), i.FrontOuterAddr[0], i.FrontPattern)
+	} else if i.NetProtocol == SocketProtcolTCP {
 		addr = i.FrontOuterAddr[0]
 	}
 	return addr
@@ -157,7 +157,7 @@ type Node struct {
 	serve bool
 
 	// 前端协议
-	sp SocketProtcol
+	sp      SocketProtcol
 	pattern string
 }
 
@@ -198,8 +198,8 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		startTime: time.Now(),
 		sessions:  make(map[int64]session.Session),
 		quit:      util.NewEvent(),
-		sp: SocketProtcolUnknown,
-		pattern: "",
+		sp:        SocketProtcolUnknown,
+		pattern:   "",
 		gnode: cluster.NewGrpcNode(strconv.FormatInt(opts.ID, 10),
 			cluster.OptWithLogger(opts.Logger),
 			cluster.OptWithGrpcOption(opts.grpcOpts...)),
@@ -251,8 +251,8 @@ func (n *Node) GetInfo() Info {
 		FrontBindAddr:  bindAddrs,
 		FrontOuterAddr: outerAddrs,
 		InnerGrpcAddr:  n.gnode.GetAddr(),
-		NetProtocol:n.sp,
-		FrontPattern:n.pattern,
+		NetProtocol:    n.sp,
+		FrontPattern:   n.pattern,
 	}
 }
 
@@ -390,7 +390,7 @@ func (n *Node) Serve(sp SocketProtcol, addr string, opts ...INodeServeOption) er
 
 	n.mu.Lock()
 	n.sp = sp
-	if opt.pattern != ""{
+	if opt.pattern != "" {
 		n.pattern = opt.pattern
 	}
 	n.mu.Unlock()
@@ -663,37 +663,47 @@ func (n *Node) handleConn(conn conn.MsgConn) {
 	s.Handle(n.srvHandle)
 }
 
-func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
+func (n *Node) onCall(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) (cres interface{}, err error) {
 
 	beg := time.Now()
 
-	res, err := callee(req)
+	if n.opts.callHook != nil {
+		cres, err = n.opts.callHook(ctx, s, srv, srvName, methodName, req, callee)
+	} else {
+		cres, err = callee(req)
+	}
 
 	if n.opts.showHandleLog {
-		n.opts.Logger.Infof("%s.%s(req:{%v}) (res:{%v},err:%v) => %v", srvName, methodName, req, res, err, time.Now().Sub(beg))
+		n.opts.Logger.Infof("%s.%s(req:{%v}) (res:{%v},err:%v) => %v", srvName, methodName, req, cres, err, time.Since(beg))
 	}
 
 	// trace
 	if n.opts.enableTraceDetail {
 		session.SetReadPayloadObj(ctx, req)
-		session.SetWritePayloadObj(ctx, res)
+		session.SetWritePayloadObj(ctx, cres)
 	}
 
 	if n.opts.metricsMsgProcDelayEnabled() {
-		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Now().Sub(beg))
+		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Since(beg))
 	}
 
-	return err
+	return
 }
 
 func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {
 
 	beg := time.Now()
 
-	err := callee(req)
+	var err error = nil
+
+	if n.opts.notifyHook != nil {
+		err = n.opts.notifyHook(ctx, s, srv, srvName, methodName, req, callee)
+	} else {
+		err = callee(req)
+	}
 
 	if n.opts.showHandleLog {
-		n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Now().Sub(beg))
+		n.opts.Logger.Infof("%s.%s(req:%v) (err:%v) => %v", srvName, methodName, req, err, time.Since(beg))
 	}
 
 	// trace
@@ -702,7 +712,7 @@ func (n *Node) onNotify(ctx context.Context, s interface{}, srv interface{}, srv
 	}
 
 	if n.opts.metricsMsgProcDelayEnabled() {
-		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Now().Sub(beg))
+		metrics.ReportMsgProcDelay(n.opts.metricsReporters, n.opts.ID, n.opts.Name, srvName, methodName, time.Since(beg))
 	}
 
 	return err

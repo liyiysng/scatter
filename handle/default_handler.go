@@ -66,12 +66,11 @@ type OptionalArgs struct {
 	Call              func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error
 }
 
-type CallHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error
+type CallHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) (cres interface{}, err error)
 type NotifyHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error
 
-var DefaultCallHook = func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) error {
-	_, err := callee(req)
-	return err
+var DefaultCallHook = func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) (cres interface{}, err error) {
+	return callee(req)
 }
 
 var DefaultNotifyHook = func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (err error)) error {
@@ -208,7 +207,7 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 			return
 		}
 
-		err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
+		_, err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
 
 		if err != nil {
 			return
