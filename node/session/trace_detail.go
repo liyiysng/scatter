@@ -154,7 +154,7 @@ func (info *MsgInfo) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("[MsgInfo.MarshalJSON] %v", err)
 	}
-	return []byte(str), err
+	return str, err
 }
 
 func (info *MsgInfo) String() string {
