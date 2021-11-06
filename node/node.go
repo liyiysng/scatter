@@ -373,6 +373,12 @@ func (n *Node) AddAfterStop(f ...func()) error {
 	return nil
 }
 
+func (n *Node) SessionCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return len(n.sessions)
+}
+
 // Serve 启动一个Serve
 // Serve 除Stop或者 被调用之外,都返回一个非nil错误
 // arg[0] = certfile
