@@ -40,6 +40,8 @@ type Message interface {
 	GetSequence() int32
 	// 获取数据
 	GetPayload() []byte
+	// 获取自定制错误
+	GetCustomError() string
 	// 字符表达
 	String() string
 }
