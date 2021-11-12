@@ -6,7 +6,7 @@ import "github.com/spf13/viper"
 func NewCustomMetricsSpec(config *viper.Viper) (*CustomMetricsSpec, error) {
 	var spec CustomMetricsSpec
 
-	err := config.UnmarshalKey("scatter.metrics.custom", &spec)
+	err := config.UnmarshalKey("metrics.custom", &spec)
 	if err != nil {
 		return nil, err
 	}

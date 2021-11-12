@@ -82,16 +82,16 @@ func (p *PrometheusReporter) registerAllMetrics(
 	config *viper.Viper,
 ) error {
 
-	additionalLabels := config.GetStringMapString("scatter.metrics.additionalTags")
+	additionalLabels := config.GetStringMapString("metrics.additionalTags")
 	p.additionalLabels = additionalLabels
-	ns := config.GetString("scatter.metrics.prometheus.namespace")
+	ns := config.GetString("metrics.namespace")
 
 	additionalLabelsKeys := make([]string, 0, len(additionalLabels))
 	for key := range additionalLabels {
 		additionalLabelsKeys = append(additionalLabelsKeys, key)
 	}
 
-	constLabels := config.GetStringMapString("scatter.metrics.constTags")
+	constLabels := config.GetStringMapString("metrics.constTags")
 
 	// 系统指标
 	spec, err := NewSysMetricsSpec()
@@ -140,7 +140,8 @@ func (p *PrometheusReporter) registerAllMetrics(
 
 // NewPrometheusReporter 创建
 func NewPrometheusReporter(
-	config *viper.Viper,
+	pconfig *viper.Viper,
+	mconfig *viper.Viper,
 ) (Reporter, error) {
 
 	prometheusReporter := &PrometheusReporter{
@@ -150,9 +151,9 @@ func NewPrometheusReporter(
 		gaugeReportersMap:   make(map[string]*prometheus.GaugeVec),
 	}
 
-	if config.GetString("scatter.metrics.prometheus.collect_type") == "listen" {
-		port := config.GetInt("scatter.metrics.prometheus.port")
-		prometheusReporter.registerAllMetrics(config)
+	if pconfig.GetString("prometheus.collect_type") == "listen" {
+		port := pconfig.GetInt("prometheus.listen.port")
+		prometheusReporter.registerAllMetrics(mconfig)
 		http.Handle("/metrics", promhttp.Handler())
 		go func() {
 			lErr := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
@@ -161,16 +162,16 @@ func NewPrometheusReporter(
 			}
 		}()
 	} else {
-		jobName := config.GetString("scatter.metrics.prometheus.pusher.job_name")
-		prometheusReporter.pusher = push.New(config.GetString("scatter.metrics.prometheus.pusher.addr"), jobName)
-		prometheusReporter.registerAllMetrics(config)
+		jobName := pconfig.GetString("prometheus.pusher.job_name")
+		prometheusReporter.pusher = push.New(pconfig.GetString("prometheus.pusher.addr"), jobName)
+		prometheusReporter.registerAllMetrics(mconfig)
 		err := prometheusReporter.pusher.Push()
 		if err != nil {
 			return nil, err
 		}
 		go func() {
 
-			waitTicker := time.NewTicker(config.GetDuration("scatter.metrics.prometheus.pusher.inteval"))
+			waitTicker := time.NewTicker(pconfig.GetDuration("prometheus.pusher.inteval"))
 			defer waitTicker.Stop()
 
 			prometheusReporter.wg.Add(1)

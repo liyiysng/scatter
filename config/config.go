@@ -50,19 +50,6 @@ func (c *Config) fillDefaultValues() {
 
 	defaultsMap := map[string]interface{}{
 		"scatter.game": "scatter",
-		// metrics config
-		"scatter.metrics.prometheus.collect_type": "push", // push , listen
-		"scatter.metrics.prometheus.namespace":    "scatter",
-		// metrics pusher
-		"scatter.metrics.prometheus.pusher.job_name": "scatter",
-		"scatter.metrics.prometheus.pusher.addr":     ":9091",
-		"scatter.metrics.prometheus.pusher.inteval":  "1s",
-		// metrics listen
-		"scatter.metrics.prometheus.port": 8888,
-		// other
-		"scatter.metrics.additionalTags": map[string]string{}, // 提供缺省值
-		"scatter.metrics.constTags":      map[string]string{},
-		"scatter.metrics.custom":         map[string]interface{}{},
 
 		// es settings ////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////
