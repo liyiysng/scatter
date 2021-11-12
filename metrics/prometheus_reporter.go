@@ -6,18 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/liyiysng/scatter/config"
-	"github.com/liyiysng/scatter/constants"
 	"github.com/liyiysng/scatter/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/spf13/viper"
 )
 
 // PrometheusReporter Prometheus 监控指标
 type PrometheusReporter struct {
-	serverType          string
-	game                string
 	countReportersMap   map[string]*prometheus.CounterVec
 	summaryReportersMap map[string]*prometheus.SummaryVec
 	gaugeReportersMap   map[string]*prometheus.GaugeVec
@@ -35,6 +32,7 @@ func (p *PrometheusReporter) Close() {
 }
 
 func (p *PrometheusReporter) registerMetrics(
+	ns string,
 	constLabels map[string]string,
 	additionalLabelsKeys []string,
 	spec *CustomMetricsSpec,
@@ -42,7 +40,7 @@ func (p *PrometheusReporter) registerMetrics(
 	for _, summary := range spec.Summaries {
 		p.summaryReportersMap[summary.Name] = prometheus.NewSummaryVec(
 			prometheus.SummaryOpts{
-				Namespace:   constants.MetricsNamespace,
+				Namespace:   ns,
 				Subsystem:   summary.Subsystem,
 				Name:        summary.Name,
 				Help:        summary.Help,
@@ -56,7 +54,7 @@ func (p *PrometheusReporter) registerMetrics(
 	for _, gauge := range spec.Gauges {
 		p.gaugeReportersMap[gauge.Name] = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace:   constants.MetricsNamespace,
+				Namespace:   ns,
 				Subsystem:   gauge.Subsystem,
 				Name:        gauge.Name,
 				Help:        gauge.Help,
@@ -69,7 +67,7 @@ func (p *PrometheusReporter) registerMetrics(
 	for _, counter := range spec.Counters {
 		p.countReportersMap[counter.Name] = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace:   constants.MetricsNamespace,
+				Namespace:   ns,
 				Subsystem:   counter.Subsystem,
 				Name:        counter.Name,
 				Help:        counter.Help,
@@ -81,39 +79,40 @@ func (p *PrometheusReporter) registerMetrics(
 }
 
 func (p *PrometheusReporter) registerAllMetrics(
-	constLabels, additionalLabels map[string]string,
-	config *config.Config,
+	config *viper.Viper,
 ) error {
 
-	constLabels["game"] = p.game
-	constLabels["serverType"] = p.serverType
-
+	additionalLabels := config.GetStringMapString("scatter.metrics.additionalTags")
 	p.additionalLabels = additionalLabels
+	ns := config.GetString("scatter.metrics.prometheus.namespace")
+
 	additionalLabelsKeys := make([]string, 0, len(additionalLabels))
 	for key := range additionalLabels {
 		additionalLabelsKeys = append(additionalLabelsKeys, key)
 	}
+
+	constLabels := config.GetStringMapString("scatter.metrics.constTags")
 
 	// 系统指标
 	spec, err := NewSysMetricsSpec()
 	if err != nil {
 		return err
 	}
-	p.registerMetrics(constLabels, additionalLabelsKeys, spec)
+	p.registerMetrics(ns, constLabels, additionalLabelsKeys, spec)
 
 	// 节点指标
 	spec, err = NewNodeMetricsSpec()
 	if err != nil {
 		return err
 	}
-	p.registerMetrics(constLabels, additionalLabelsKeys, spec)
+	p.registerMetrics(ns, constLabels, additionalLabelsKeys, spec)
 
 	// 自定义指标
 	spec, err = NewCustomMetricsSpec(config)
 	if err != nil {
 		return err
 	}
-	p.registerMetrics(constLabels, additionalLabelsKeys, spec)
+	p.registerMetrics(ns, constLabels, additionalLabelsKeys, spec)
 
 	toRegister := make([]prometheus.Collector, 0)
 	for _, c := range p.countReportersMap {
@@ -141,17 +140,10 @@ func (p *PrometheusReporter) registerAllMetrics(
 
 // NewPrometheusReporter 创建
 func NewPrometheusReporter(
-	serverType string,
-	config *config.Config,
-	constLabels map[string]string,
+	config *viper.Viper,
 ) (Reporter, error) {
-	port := config.GetInt("scatter.metrics.prometheus.port")
-	game := config.GetString("scatter.game")
-	additionalLabels := config.GetStringMapString("scatter.metrics.additionalTags")
 
 	prometheusReporter := &PrometheusReporter{
-		serverType:          serverType,
-		game:                game,
 		closeEvent:          util.NewEvent(),
 		countReportersMap:   make(map[string]*prometheus.CounterVec),
 		summaryReportersMap: make(map[string]*prometheus.SummaryVec),
@@ -159,7 +151,8 @@ func NewPrometheusReporter(
 	}
 
 	if config.GetString("scatter.metrics.prometheus.collect_type") == "listen" {
-		prometheusReporter.registerAllMetrics(constLabels, additionalLabels, config)
+		port := config.GetInt("scatter.metrics.prometheus.port")
+		prometheusReporter.registerAllMetrics(config)
 		http.Handle("/metrics", promhttp.Handler())
 		go func() {
 			lErr := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
@@ -168,8 +161,9 @@ func NewPrometheusReporter(
 			}
 		}()
 	} else {
-		prometheusReporter.pusher = push.New(config.GetString("scatter.metrics.prometheus.pusher.addr"), serverType)
-		prometheusReporter.registerAllMetrics(constLabels, additionalLabels, config)
+		jobName := config.GetString("scatter.metrics.prometheus.pusher.job_name")
+		prometheusReporter.pusher = push.New(config.GetString("scatter.metrics.prometheus.pusher.addr"), jobName)
+		prometheusReporter.registerAllMetrics(config)
 		err := prometheusReporter.pusher.Push()
 		if err != nil {
 			return nil, err

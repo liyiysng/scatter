@@ -1,8 +1,8 @@
 package message
 
 import (
-	"github.com/golang/protobuf/proto"
 	phead "github.com/liyiysng/scatter/node/message/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // ProtobufMsg protobuf类型消息

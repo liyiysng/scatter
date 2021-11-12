@@ -854,7 +854,7 @@ func (srv *ServiceMetricsTest) Foo4(ctx context.Context, session session.Session
 
 // 指标测试
 func TestNodeMetrics(t *testing.T) {
-	reporter, err := metrics.NewPrometheusReporter("node_metrics", config.NewConfig(), map[string]string{})
+	reporter, err := metrics.NewPrometheusReporter(config.NewConfig().Viper)
 	if err != nil {
 		t.Fatal(err)
 	}

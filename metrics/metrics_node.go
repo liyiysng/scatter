@@ -13,7 +13,7 @@ const (
 	readBytesTotal  = "read_bytes_total"
 	writeBytesTotal = "write_bytes_total"
 	// 消息处理延时
-	msgProcDelay = "msg_proc_delay"
+	msgProcDelay = "msg_proc_delay_ms"
 )
 
 // NewNodeMetricsSpec 获取节点相关指标

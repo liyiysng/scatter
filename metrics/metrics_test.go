@@ -21,7 +21,7 @@ func TestReadWriteCount(t *testing.T) {
 
 	cfg := config.NewConfig(c)
 
-	reporter, err := NewPrometheusReporter("game_service", cfg, map[string]string{"foo": "foo1"})
+	reporter, err := NewPrometheusReporter(cfg.Viper)
 
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestSummer(t *testing.T) {
 
 	cfg := config.NewConfig(c)
 
-	reporter, err := NewPrometheusReporter("game_service", cfg, map[string]string{})
+	reporter, err := NewPrometheusReporter(cfg.Viper)
 
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestSys(t *testing.T) {
 
 	cfg := config.NewConfig()
 
-	reporter, err := NewPrometheusReporter("game_service", cfg, map[string]string{"foo": "foo1"})
+	reporter, err := NewPrometheusReporter(cfg.Viper)
 
 	if err != nil {
 		t.Fatal(err)
