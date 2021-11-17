@@ -25,7 +25,7 @@ func WithBackendSessionID(ctx context.Context, ID string) context.Context {
 }
 
 type IBackendSessionMgr interface {
-	GetNID(srvName, id string) (nid string, exists bool)
+	GetNID(ctx context.Context, srvName, id string) (nid string, exists bool)
 }
 
 var _bsMgr IBackendSessionMgr = nil
@@ -115,7 +115,7 @@ func (p *backendSessionPicker) Pick(info balancer.PickInfo) (res balancer.PickRe
 				if smgr == nil {
 					return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] session mgr not set , call SetupBackendSessionMgr first")
 				}
-				if nid, exists := smgr.GetNID(p.srvName, id); exists {
+				if nid, exists := smgr.GetNID(info.Ctx, p.srvName, id); exists {
 					//确保当前nid可用
 					if conn, cok := p.subConns[nid]; cok {
 						return balancer.PickResult{SubConn: conn}, nil
