@@ -68,17 +68,19 @@ func newLogger() Logger {
 	warningW := ioutil.Discard
 	infoW := ioutil.Discard
 
-	logLevel := os.Getenv("SCATTER_GO_LOG_SEVERITY_LEVEL")
+	logLevel, ok := os.LookupEnv("SCATTER_GO_LOG_SEVERITY_LEVEL")
 
-	logLevel = "INFO"
+	if !ok {
+		logLevel = "INFO"
+	}
 
 	switch logLevel {
 	case "", "ERROR", "error": // If env is unset, set level to ERROR.
 		errorW = os.Stderr
 	case "WARNING", "warning":
-		warningW = os.Stderr
+		warningW = os.Stdout
 	case "INFO", "info":
-		infoW = os.Stderr
+		infoW = os.Stdout
 	}
 
 	var v int
