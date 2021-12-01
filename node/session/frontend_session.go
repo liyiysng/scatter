@@ -188,6 +188,9 @@ type frontendSession struct {
 	tickerMutex sync.Mutex
 	ticker      map[string]*sessionTicker
 
+	onHandle func(ss Session, msgRead message.Message, h handle.IHandler, err error)
+	onPush   func(ss Session, msgPush message.Message, err error)
+
 	wg util.WaitGroupWrapper
 }
 
@@ -244,6 +247,21 @@ func (s *frontendSession) BindUID(uid constants.UID) {
 	s.uid = uid
 	strUID := fmt.Sprintf("%v", uid)
 	s.ctx = policy.WithConsistentHashID(s.ctx, strUID)
+}
+
+// 获取处理
+func (s *frontendSession) SetOnHandle(cb func(ss Session, msgRead message.Message, h handle.IHandler, err error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onHandle = cb
+}
+
+// 设置push
+// 非协程安全
+func (s *frontendSession) SetOnPush(cb func(ss Session, msgPush message.Message, err error)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onPush = cb
 }
 
 func (s *frontendSession) IsUIDBind() bool {
@@ -589,22 +607,23 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 					checkConnectTimeout.Stop()
 				}
 
+				srvName := mctx.msgRead.GetService()
 				// 处理消息
 				err := s.handleMsg(mctx, srvHandler)
 				if err != nil {
 					// 关键错误
 					if cErr, ok := err.(handle.ICriticalError); ok {
-						s.opt.Logger.Errorf("handle req %s message encount a critical error %v", mctx.msgRead.GetService(), cErr)
+						s.opt.Logger.Errorf("handle req %s message encount a critical error %v", srvName, cErr)
 						s.finishMsg(mctx, cErr)
 						return
 					} else if customErr, ok := err.(handle.ICustomError); ok {
 						// 非关键错误
 						if s.opt.Logger.V(logger.VDEBUG) {
-							s.opt.Logger.Warningf("handle req %s message encount custom error %v", mctx.msgRead.GetService(), customErr)
+							s.opt.Logger.Warningf("handle req %s message encount custom error %v", srvName, customErr)
 						}
 					} else {
 						if s.opt.Logger.V(logger.VDEBUG) {
-							s.opt.Logger.Warningf("handle req %s message encount a error %v", mctx.msgRead.GetService(), err)
+							s.opt.Logger.Warningf("handle req %s message encount a error %v", srvName, err)
 						}
 						s.finishMsg(mctx, err)
 						return
@@ -633,7 +652,7 @@ func (s *frontendSession) Handle(srvHandler handle.IHandler) {
 
 }
 
-func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) error {
+func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) (err error) {
 
 	if mctx.ctx.Err() != nil { // 已经超时或取消
 		return handle.NewCustomErrorWithError(mctx.ctx.Err())
@@ -643,11 +662,17 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) er
 		mctx.WithTimeout(s.opt.MsgHandleTimeOut)
 	}
 
+	defer func() {
+		if s.onHandle != nil {
+			s.onHandle(s, mctx.msgRead, srvHandler, err)
+		}
+	}()
+
 	// 处理读取的消息
 	switch mctx.msgRead.GetMsgType() {
 	case phead.MsgType_NOTIFY:
 		{
-			err := s.handleNotify(mctx, srvHandler)
+			err = s.handleNotify(mctx, srvHandler)
 			if err != nil {
 				return err
 			}
@@ -870,7 +895,7 @@ func (s *frontendSession) runWrite() {
 
 				err = s.writeMsg(mctx)
 				if err != nil {
-					s.opt.Logger.Errorf("write message error %v" , err)
+					s.opt.Logger.Errorf("write message error %v", err)
 					// io错误 关闭链接
 					err = fmt.Errorf("write io error:%v", err)
 					return
@@ -903,8 +928,14 @@ func (s *frontendSession) flush() error {
 	return err
 }
 
-func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error {
-	var err error = nil
+func (s *frontendSession) writeMsgInternal(mctx *msgCtx) (err error) {
+
+	defer func() {
+		if mctx.msgWrite.GetMsgType() == phead.MsgType_PUSH && s.onPush != nil {
+			s.onPush(s, mctx.msgWrite, err)
+		}
+	}()
+
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 
@@ -917,8 +948,8 @@ func (s *frontendSession) writeMsgInternal(mctx *msgCtx) error {
 	endWirteTotalBytes := s.conn.GetCurrentWirteTotalBytes()
 	mctx.writeBytes = endWirteTotalBytes - beginWriteTotalBytes
 
-	if err != nil{
-		err = fmt.Errorf("{%s} {%v}",mctx.msgRead.GetService(),err)
+	if err != nil {
+		err = fmt.Errorf("{%s} {%v}", mctx.msgRead.GetService(), err)
 	}
 
 	return err

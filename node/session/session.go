@@ -90,6 +90,16 @@ type Session interface {
 	// uid
 	BindUID(uid constants.UID)
 
+	// 获取处理
+	// cb协程安全
+	// 切勿再cb内访问session 或 执行较长时间得阻塞任务
+	SetOnHandle(cb func(ss Session, msgRead message.Message, h handle.IHandler, err error))
+
+	// 设置push
+	// cb协程安全
+	// 切勿再cb内访问session 或 执行较长时间得阻塞任务
+	SetOnPush(cb func(ss Session, msgPush message.Message, err error))
+
 	// ticker job
 	// 任务将在单独的协程中执行
 	// 当session结束时,所有的定时任务自动清理
