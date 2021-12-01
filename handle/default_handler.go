@@ -63,7 +63,8 @@ type service struct {
 // OptionalArgs 可选参数
 type OptionalArgs struct {
 	ArgsTypeValidator func(srvName string, methodName string, argsType []reflect.Type) error
-	Call              func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error
+	Call              func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) (interface{} , error)) (res interface{} , err error)
+	Notify            func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) (error)) (err error)
 }
 
 type CallHookType func(ctx context.Context, session interface{}, srv interface{}, srvName string, methodName string, req interface{}, callee func(req interface{}) (res interface{}, err error)) (cres interface{}, err error)
@@ -159,15 +160,20 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 		argSession := reflect.ValueOf(session)
 
 		function := mtype.method.Func
-		var retValues []reflect.Value
 
-		errGetter := func() error {
-			// 第二个返回值为错误对象
-			retErrInterface := retValues[1].Interface()
-			if retErrInterface != nil {
-				return retErrInterface.(error)
+		converter := func(v []reflect.Value) (interface{},error) {
+			if len(v) != 2{
+				return nil,NewCriticalError("call function must have 2 return value")
 			}
-			return nil
+			// 先获取错误
+			// 第二个返回值为错误对象
+			retErrInterface := v[1].Interface()
+			if retErrInterface != nil {
+				return nil,retErrInterface.(error)
+			}
+			// 在获取处理结果
+			retRes := v[0].Interface()
+			return retRes , nil
 		}
 
 		callee := func(req interface{}) (callRes interface{}, callErr error) {
@@ -175,53 +181,34 @@ func (s *serviceHandler) Call(ctx context.Context, session interface{}, serviceN
 			varArgs := []reflect.Value{svci.recv, argCtx, argSession, reflect.ValueOf(req)}
 			if mtype.hasOptArgs {
 
-				optCallee := func(args ...interface{}) error {
+				optCallee := func(args ...interface{}) (optCalleeRes interface{} , optCalleeErr error) {
 					for i := 0; i < len(args); i++ {
 						varArgs = append(varArgs, reflect.ValueOf(args[i]))
 					}
-					retValues = function.Call(varArgs)
-					return errGetter()
+					retValues := function.Call(varArgs)
+					return converter(retValues)
 				}
-
-				callErr = s.OptArgs.Call(session, serviceName, methodName, optCallee)
-
-				if callErr != nil {
-					return
-				}
+				return s.OptArgs.Call(session, serviceName, methodName, optCallee)
 
 			} else {
 				// call func
-				retValues = function.Call(varArgs)
+				retValues := function.Call(varArgs)
+				return converter(retValues)
 			}
-
-			// 检查错误
-			callErr = errGetter()
-			if callErr == nil {
-				callRes = retValues[0].Interface()
-				// 无错误,但是res为空
-				if callRes == nil {
-					callErr = errors.New("nil response")
-					return
-				}
-			}
-			return
 		}
 
-		_, err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
-
+		var callerRes interface{} = nil
+		callerRes, err = s.HookCall(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)
 		if err != nil {
-			return
+			return nil , err
 		}
 
-		callerRes := retValues[0].Interface()
 		if callerRes == nil {
 			err = NewCriticalErrorf("[serviceHandler.Call] %s.%s nil response", serviceName, methodName)
-			return
+			return nil , err
 		}
 
-		res, err = s.Codec.Marshal(callerRes)
-		return
-
+		return s.Codec.Marshal(callerRes)
 	}
 
 	err = NewCriticalErrorf("[serviceHandler.Call] can't find %s.%s", serviceName, methodName)
@@ -252,9 +239,12 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 		function := mtype.method.Func
 		var retValues []reflect.Value
 
-		errGetter := func() error {
-			// 第一个返回值为错误对象
-			retErrInterface := retValues[0].Interface()
+		converter := func(v []reflect.Value) (error) {
+			if len(v) != 1{
+				return NewCriticalError("notify function must have 1 return value")
+			}
+			// 获取错误
+			retErrInterface := v[0].Interface()
 			if retErrInterface != nil {
 				return retErrInterface.(error)
 			}
@@ -271,23 +261,15 @@ func (s *serviceHandler) Notify(ctx context.Context, session interface{}, servic
 						varArgs = append(varArgs, reflect.ValueOf(args[i]))
 					}
 					retValues = function.Call(varArgs)
-					return errGetter()
+					return converter(retValues)
 				}
-
-				callErr = s.OptArgs.Call(session, serviceName, methodName, optCallee)
-
-				if callErr != nil {
-					return
-				}
+				return s.OptArgs.Notify(session, serviceName, methodName, optCallee)
 
 			} else {
 				// call func
 				retValues = function.Call(varArgs)
+				return converter(retValues)
 			}
-
-			// 检查错误
-			callErr = errGetter()
-			return
 		}
 
 		err = s.HookNofify(ctx, session, svci, serviceName, methodName, argReq.Interface(), callee)

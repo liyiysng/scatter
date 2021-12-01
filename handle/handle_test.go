@@ -112,12 +112,12 @@ func TestServiceHandler(t *testing.T) {
 				}
 				return nil
 			},
-			Call: func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) error) error {
+			Call: func(session interface{}, srvName string, methodName string, callee func(argValues ...interface{}) (interface{}, error)) (interface{}, error) {
 
 				if strings.HasSuffix(methodName, "Args") {
 					return callee(10, int32(1))
 				}
-				return errors.New("optional args not support")
+				return nil, errors.New("optional args not support")
 			},
 		},
 	}
