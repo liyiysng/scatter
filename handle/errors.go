@@ -1,17 +1,30 @@
 package handle
 
-import "fmt"
+import (
+	"fmt"
+)
+
+const (
+	COMMON_SUCCESS_CODE int32 = 0
+	CONNON_FAILED_CODE  int32 = 1
+)
 
 // ICustomError 用户定义错误
 // 不会导致链接关闭(如:通知卡牌数量不足等...)
 type ICustomError interface {
 	error
+	Code() int32
 	customErrorMark()
 }
 
 // CustomError implements error interface
 type CustomError struct {
-	err string
+	code int32
+	err  string
+}
+
+func (e *CustomError) Code() int32 {
+	return e.code
 }
 
 func (e *CustomError) Error() string {
@@ -30,14 +43,23 @@ func NewCustomErrorf(format string, args ...interface{}) ICustomError {
 // NewCustomError 创建自定义错误
 func NewCustomError(args ...interface{}) ICustomError {
 	return &CustomError{
-		err: fmt.Sprint(args...),
+		code: CONNON_FAILED_CODE,
+		err:  fmt.Sprint(args...),
+	}
+}
+
+func NewCustomErrorWithCode(code int32, args ...interface{}) ICustomError {
+	return &CustomError{
+		code: code,
+		err:  fmt.Sprint(args...),
 	}
 }
 
 // NewCustomErrorWithError 创建自定义错误
 func NewCustomErrorWithError(err error) *CustomError {
 	return &CustomError{
-		err: err.Error(),
+		code: CONNON_FAILED_CODE,
+		err:  err.Error(),
 	}
 }
 
@@ -83,20 +105,23 @@ func NewCriticalErrorWithError(err error) ICriticalError {
 // NewArgumentsError 参数错误
 func NewArgumentsError(args ...interface{}) ICustomError {
 	return &CustomError{
-		err: fmt.Sprint(args...),
+		code: CONNON_FAILED_CODE,
+		err:  fmt.Sprint(args...),
 	}
 }
 
 // NewArgumentsError 逻辑错误
 func NewLogicError(args ...interface{}) ICustomError {
 	return &CustomError{
-		err: fmt.Sprint(args...),
+		code: CONNON_FAILED_CODE,
+		err:  fmt.Sprint(args...),
 	}
 }
 
 // NewConfigError 配置错误
 func NewConfigError(args ...interface{}) ICustomError {
 	return &CustomError{
-		err: fmt.Sprint(args...),
+		code: CONNON_FAILED_CODE,
+		err:  fmt.Sprint(args...),
 	}
 }

@@ -41,7 +41,7 @@ type Message interface {
 	// 获取数据
 	GetPayload() []byte
 	// 获取自定制错误
-	GetCustomError() string
+	GetError() *proto.MsgError
 	// 字符表达
 	String() string
 }
@@ -61,7 +61,7 @@ type Factor interface {
 	// BuildResponseMessage 创建一个回复
 	BuildResponseMessage(sequence int32, srv string, payload []byte) (msg Message, err error)
 	// BuildResponseCustomErrorMessage 创建一个自定义错误回复
-	BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error)
+	BuildResponseCustomErrorMessage(sequence int32, srv string, e *proto.MsgError) (msg Message, err error)
 	// BuildKickMessage 创建一个踢出消息
 	BuildKickMessage() (msg Message, err error)
 

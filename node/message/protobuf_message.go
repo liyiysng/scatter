@@ -127,13 +127,13 @@ func (f *protoBufFactory) BuildResponseMessage(sequence int32, srv string, paylo
 }
 
 //BuildResponseCustomErrorMessage 创建一个自定义错误回复
-func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, srv string, customError string) (msg Message, err error) {
+func (f *protoBufFactory) BuildResponseCustomErrorMessage(sequence int32, srv string, e *phead.MsgError) (msg Message, err error) {
 	msg = &ProtobufMsg{
 		Head: phead.Head{
-			MsgType:     phead.MsgType_RESPONSE,
-			Service:     srv,
-			Sequence:    sequence,
-			CustomError: customError,
+			MsgType:  phead.MsgType_RESPONSE,
+			Service:  srv,
+			Sequence: sequence,
+			Error:    e,
 		},
 	}
 	return

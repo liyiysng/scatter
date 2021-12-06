@@ -4,12 +4,16 @@ package scatter.node.proto;
 
 option go_package = "github.com/liyiysng/scatter/node/message/proto";
 
+message MsgError{
+	int32 Code = 1;
+	string Describe = 2;
+}
 
 message Head{
     MsgType MsgType = 1; // 消息类型
     int32 Sequence = 2;// 请求时由客户端填充 , 回复时由服务器设置相同序列 
     string Service = 3;// 服务名称 如 Game.Foo
-    string CustomError = 4; // 自定义错误描述 货币不足等逻辑错误
+    MsgError Error = 4; // 自定义错误描述 货币不足等逻辑错误
     bytes Payload = 5;// 数据
 }
 
@@ -17,11 +21,7 @@ message MsgHandShake{
     string Platform = 1;
     string ClientVersion = 2;
     string BuildVersion = 3;
-    string UDID = 4; // 用户硬件设备号（b站原话：用户硬件设备号--Android和iOS都用的uuid，32位通用唯一识别码）
-}
-
-message MsgError{
-    string errorInfo = 1;
+		string UDID = 4; // 用户硬件设备号（b站原话：用户硬件设备号--Android和iOS都用的uuid，32位通用唯一识别码）
 }
 
 //消息类型

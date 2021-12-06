@@ -688,7 +688,10 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) (e
 				if customErr, ok := err.(handle.ICustomError); ok {
 					// 非关键错误
 					// 回复客户端
-					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(sequence, srv, customErr.Error())
+					mctx.msgWrite, err = message.MsgFactory.BuildResponseCustomErrorMessage(sequence, srv, &phead.MsgError{
+						Code:     customErr.Code(),
+						Describe: customErr.Error(),
+					})
 					if err != nil {
 						return err
 					}
