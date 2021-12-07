@@ -133,8 +133,9 @@ func (ss *SubServiceImp) Call(ctx context.Context, req *subsrvpb.CallReq) (res *
 		errInfo := &subsrvpb.ErrorInfo{
 			Err: cerr.Error(),
 		}
-		if _, ok := cerr.(handle.ICustomError); ok {
+		if customError, ok := cerr.(handle.ICustomError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCustom
+			errInfo.Code = customError.Code()
 		} else if _, ok := cerr.(handle.ICriticalError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCritical
 		} else {
@@ -166,8 +167,9 @@ func (ss *SubServiceImp) Notify(ctx context.Context, req *subsrvpb.NotifyReq) (r
 		errInfo := &subsrvpb.ErrorInfo{
 			Err: cerr.Error(),
 		}
-		if _, ok := cerr.(handle.ICustomError); ok {
+		if customError, ok := cerr.(handle.ICustomError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCustom
+			errInfo.Code = customError.Code()
 		} else if _, ok := cerr.(handle.ICriticalError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCritical
 		} else {
@@ -194,8 +196,9 @@ func (ss *SubServiceImp) Pub(ctx context.Context, req *subsrvpb.PubReq) (res *su
 		errInfo := &subsrvpb.ErrorInfo{
 			Err: cerr.Error(),
 		}
-		if _, ok := cerr.(handle.ICustomError); ok {
+		if customError, ok := cerr.(handle.ICustomError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCustom
+			errInfo.Code = customError.Code()
 		} else if _, ok := cerr.(handle.ICriticalError); ok {
 			errInfo.ErrType = subsrvpb.ErrorInfo_ErrorTypeCritical
 		} else {

@@ -87,7 +87,7 @@ func (h *srvHanleProxy) Call(ctx context.Context, session interface{}, serviceNa
 	}
 	if cres.ErrInfo != nil {
 		if cres.ErrInfo.ErrType == subsrvpb.ErrorInfo_ErrorTypeCustom {
-			return nil, handle.NewCustomError(cres.ErrInfo.Err)
+			return nil, handle.NewCustomErrorWithCode(cres.ErrInfo.Code, cres.ErrInfo.Err)
 		} else if cres.ErrInfo.ErrType == subsrvpb.ErrorInfo_ErrorTypeCritical {
 			return nil, handle.NewCriticalError(cres.ErrInfo.Err)
 		}
@@ -128,7 +128,7 @@ func (h *srvHanleProxy) Notify(ctx context.Context, session interface{}, service
 	}
 	if cres.ErrInfo != nil {
 		if cres.ErrInfo.ErrType == subsrvpb.ErrorInfo_ErrorTypeCustom {
-			return handle.NewCustomError(cres.ErrInfo.Err)
+			return handle.NewCustomErrorWithCode(cres.ErrInfo.Code, cres.ErrInfo.Err)
 		} else if cres.ErrInfo.ErrType == subsrvpb.ErrorInfo_ErrorTypeCritical {
 			return handle.NewCriticalError(cres.ErrInfo.Err)
 		}

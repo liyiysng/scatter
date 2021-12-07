@@ -18,6 +18,23 @@ const (
 	_backedSessionKey _backedSessionKeyType = "_backedSessionKey"
 )
 
+type BackendSessionNotFoundError struct {
+	targetUID string
+	srvName   string
+}
+
+func (b *BackendSessionNotFoundError) TargetUID() string {
+	return b.targetUID
+}
+
+func (b *BackendSessionNotFoundError) ServiceName() string {
+	return b.srvName
+}
+
+func (b *BackendSessionNotFoundError) Error() string {
+	return fmt.Sprintf("backend session %s not", b.targetUID)
+}
+
 // WithBackendSessionID ctx 需求
 func WithBackendSessionID(ctx context.Context, ID string) context.Context {
 	ctx = context.WithValue(ctx, _backedSessionKey, ID)
@@ -123,7 +140,7 @@ func (p *backendSessionPicker) Pick(info balancer.PickInfo) (res balancer.PickRe
 						return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] node %s unavailable now please retry later", nid)
 					}
 				} else {
-					return balancer.PickResult{}, fmt.Errorf("[backendSessionPicker.Pick] service %s id %s backend session not found", p.srvName, id)
+					return balancer.PickResult{}, &BackendSessionNotFoundError{targetUID: id, srvName: p.srvName}
 				}
 			}
 		}

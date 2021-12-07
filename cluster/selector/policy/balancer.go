@@ -42,6 +42,19 @@ func init() {
 	balancer.Register(newRoundRobinBuilder())
 }
 
+type IBalancerError interface {
+	error
+	ServiceName() string
+}
+
+type ServerUnvaliable struct {
+	srvName string
+}
+
+func (s *ServerUnvaliable) ServiceName() string  {
+	return s.srvName
+}
+
 // ErrorAcceptable checks if given error is acceptable.
 func ErrorAcceptable(err error) bool {
 	switch status.Code(err) {

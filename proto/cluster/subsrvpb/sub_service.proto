@@ -15,6 +15,7 @@ message ErrorInfo{
 
     ErrorType errType = 1;
     string err = 2;
+    int32 code = 3;
 }
 
 message CallReq{
