@@ -155,7 +155,7 @@ func (h *srvHanleProxy) getClient(serviceName string) (c subsrvpb.SubServiceClie
 //! 获取所有服务名
 // 支持所有服务
 func (h *srvHanleProxy) AllServiceName() []string {
-	return h.AllServiceName()
+	return h.innerHandle.AllServiceName()
 }
 
 func (h *srvHanleProxy) AllRecv() []interface{} {
