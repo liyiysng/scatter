@@ -662,9 +662,12 @@ func (s *frontendSession) handleMsg(mctx *msgCtx, srvHandler handle.IHandler) (e
 		mctx.WithTimeout(s.opt.MsgHandleTimeOut)
 	}
 
+	// make a refrence avoid finishMsg to release mctx
+	msgRead := mctx.msgRead
+
 	defer func() {
 		if s.onHandle != nil {
-			s.onHandle(s, mctx.msgRead, srvHandler, err)
+			s.onHandle(s, msgRead, srvHandler, err)
 		}
 	}()
 
