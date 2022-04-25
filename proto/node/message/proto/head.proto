@@ -21,7 +21,16 @@ message MsgHandShake{
     string Platform = 1;
     string ClientVersion = 2;
     string BuildVersion = 3;
-		string UDID = 4; // 用户硬件设备号（b站原话：用户硬件设备号--Android和iOS都用的uuid，32位通用唯一识别码）
+		string UDID = 4; // 用户硬件设备号（用户硬件设备号--Android和iOS都用的uuid，32位通用唯一识别码）
+
+		string Model = 5; // 设备的机型，例如Samsung GT-I9208
+		string OsVersion = 6; // 操作系统版本，例如13.0.2
+		string Network = 7; // 网络信息（4G/3G/WIFI/2G）。ps：不能区分移动新号就统一填2G吧
+
+		string BSdkUDid = 10; // 用户硬件设备号（b服SDK udid，客户端SDK登录事件接口获取，32位通用唯一识别码）
+		string BGameID = 11; // 游戏id（一款游戏的ID，类似app_id，b服SDK获得）
+		string BChannelID = 12; // 游戏的渠道ID（游戏安装包的渠道ID）
+		string BSkdTypeID = 13; // 客户端获取到的sdk_type（如果客户端拿不到BGameID，就填充该值，后端映射填充BGameID）
 }
 
 //消息类型
