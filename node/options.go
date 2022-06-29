@@ -128,8 +128,10 @@ type Options struct {
 	// 节点停止之后执行
 	afterStop []func()
 
-	// sub servive validator
-	subSrvValidator func(srvName string) bool
+	// sub servive
+	subSrvEnable        bool
+	subSrvValidator     func(srvName string) bool
+	subSrvClientBuilder ISubSrvClientBuilder
 
 	// grpc 配置
 	grpcOpts []grpc.ServerOption
@@ -421,16 +423,6 @@ func NOptAfterStop(f ...func()) IOption {
 	})
 }
 
-// NOptWithSubSrvValidator 子服务验证
-func NOptWithSubSrvValidator(f func(srvName string) bool) IOption {
-	return newFuncServerOption(func(o *Options) {
-		if o.lastError != nil {
-			return
-		}
-		o.subSrvValidator = f
-	})
-}
-
 // NOptWithGrpcOpts grpc配置
 func NOptWithGrpcOpts(gopt ...grpc.ServerOption) IOption {
 	return newFuncServerOption(func(o *Options) {
@@ -475,6 +467,18 @@ func NOptWithWriteTimeout(t time.Duration) IOption {
 			return
 		}
 		o.writeTimeout = t
+	})
+}
+
+//  NOptEnableSubService 启用子服务
+func NOptEnableSubService(builder ISubSrvClientBuilder, f func(srvName string) bool) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.subSrvEnable = true
+		o.subSrvValidator = f
+		o.subSrvClientBuilder = builder
 	})
 }
 

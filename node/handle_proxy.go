@@ -4,33 +4,31 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"sync"
 
-	"github.com/liyiysng/scatter/cluster"
 	"github.com/liyiysng/scatter/cluster/sessionpb"
 	"github.com/liyiysng/scatter/cluster/subsrvpb"
 	"github.com/liyiysng/scatter/handle"
 	nsession "github.com/liyiysng/scatter/node/session"
 )
 
-// 若内部handle不支持该服务,则转发该服务
-type srvHanleProxy struct {
-	innerHandle handle.IHandler
-	supportSrvs map[string]struct{}
-
-	clientBuild  cluster.IGrpcSubSrvClient
-	cmu          sync.Mutex
-	clients      map[string] /*srv name*/ subsrvpb.SubServiceClient
-	srvValidator func(srvName string) bool
+type ISubSrvClientBuilder interface {
+	GetSubServiceClient(ctx context.Context, session interface{}, srvName string) (subsrvpb.SubServiceClient, context.Context, error)
 }
 
-func newSrvHandleProxy(innerHandle handle.IHandler, clientBuild cluster.IGrpcSubSrvClient, srvValidator func(srvName string) bool) *srvHanleProxy {
+// 若内部handle不支持该服务,则转发该服务
+type srvHanleProxy struct {
+	innerHandle         handle.IHandler
+	supportSrvs         map[string]struct{}
+	subsrvClientBuilder ISubSrvClientBuilder
+	srvValidator        func(srvName string) bool
+}
+
+func newSrvHandleProxy(innerHandle handle.IHandler, subsrvClientBuilder ISubSrvClientBuilder, srvValidator func(srvName string) bool) *srvHanleProxy {
 	return &srvHanleProxy{
-		innerHandle:  innerHandle,
-		supportSrvs:  map[string]struct{}{},
-		clientBuild:  clientBuild,
-		clients:      make(map[string]subsrvpb.SubServiceClient),
-		srvValidator: srvValidator,
+		innerHandle:         innerHandle,
+		supportSrvs:         map[string]struct{}{},
+		subsrvClientBuilder: subsrvClientBuilder,
+		srvValidator:        srvValidator,
 	}
 }
 
@@ -64,7 +62,7 @@ func (h *srvHanleProxy) Call(ctx context.Context, session interface{}, serviceNa
 	if _, ok := h.supportSrvs[serviceName]; ok {
 		return h.innerHandle.Call(ctx, session, serviceName, methodName, req)
 	}
-	client, err := h.getClient(serviceName)
+	client, ctx, err := h.subsrvClientBuilder.GetSubServiceClient(ctx, session, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +103,7 @@ func (h *srvHanleProxy) Notify(ctx context.Context, session interface{}, service
 	if _, ok := h.supportSrvs[serviceName]; ok {
 		return h.innerHandle.Notify(ctx, session, serviceName, methodName, req)
 	}
-	client, err := h.getClient(serviceName)
+	client, ctx, err := h.subsrvClientBuilder.GetSubServiceClient(ctx, session, serviceName)
 	if err != nil {
 		return err
 	}
@@ -135,21 +133,6 @@ func (h *srvHanleProxy) Notify(ctx context.Context, session interface{}, service
 		return errors.New(cres.ErrInfo.Err)
 	}
 	return nil
-}
-
-func (h *srvHanleProxy) getClient(serviceName string) (c subsrvpb.SubServiceClient, err error) {
-	h.cmu.Lock()
-	defer h.cmu.Unlock()
-	if c, ok := h.clients[serviceName]; ok {
-		return c, nil
-	}
-	// dail
-	c, err = h.clientBuild.GetSubSrvClient(serviceName)
-	if err != nil {
-		return nil, err
-	}
-	h.clients[serviceName] = c
-	return c, nil
 }
 
 //! 获取所有服务名

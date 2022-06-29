@@ -210,14 +210,23 @@ func NewNode(nid int64, opt ...IOption) (n *Node, err error) {
 		return nil, err
 	}
 
-	n.srvHandle = newSrvHandleProxy(handle.NewServiceHandle(&handle.Option{
-		Codec:      n.opts.getCodec(),
-		HookCall:   n.onCall,
-		HookNofify: n.onNotify,
-		OptArgs:    n.opts.optArgs,
-	}),
-		cluster.NewGrpcClient(cluster.OptGrpcClientWithLogger(n.opts.Logger)),
-		n.opts.subSrvValidator)
+	if n.opts.subSrvEnable {
+		n.srvHandle = newSrvHandleProxy(handle.NewServiceHandle(&handle.Option{
+			Codec:      n.opts.getCodec(),
+			HookCall:   n.onCall,
+			HookNofify: n.onNotify,
+			OptArgs:    n.opts.optArgs,
+		}),
+			n.opts.subSrvClientBuilder,
+			n.opts.subSrvValidator)
+	} else {
+		n.srvHandle = handle.NewServiceHandle(&handle.Option{
+			Codec:      n.opts.getCodec(),
+			HookCall:   n.onCall,
+			HookNofify: n.onNotify,
+			OptArgs:    n.opts.optArgs,
+		})
+	}
 
 	if opts.enableEventTrace {
 		_, file, line, _ := runtime.Caller(1)
