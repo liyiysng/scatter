@@ -470,6 +470,16 @@ func NOptWithWriteTimeout(t time.Duration) IOption {
 	})
 }
 
+// NOptWithMaxPayloadLength 数据最大长度
+func NOptWithMaxPayloadLength(t int) IOption {
+	return newFuncServerOption(func(o *Options) {
+		if o.lastError != nil {
+			return
+		}
+		o.maxPayloadLength = t
+	})
+}
+
 //  NOptEnableSubService 启用子服务
 func NOptEnableSubService(builder ISubSrvClientBuilder, f func(srvName string) bool) IOption {
 	return newFuncServerOption(func(o *Options) {
